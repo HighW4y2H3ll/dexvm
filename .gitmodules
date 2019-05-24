@@ -1,0 +1,3 @@
+[submodule "dalvik"]
+	path = dalvik
+	url = git@github.com:HighW4y2H3ll/dalvik.git
