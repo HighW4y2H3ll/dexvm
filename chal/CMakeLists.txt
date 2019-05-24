@@ -25,5 +25,7 @@ add_library (libdex OBJECT
 	${PROJECT_SOURCE_DIR}/../dalvik/libdex/ZipArchive.cpp
     )
 
+add_definitions (-DHAVE_POSIX_FILEMAP=1)
+
 add_executable (dexvm main.cc)
 target_link_libraries (dexvm libdex z)
