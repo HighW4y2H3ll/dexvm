@@ -10,6 +10,9 @@
 #include "libdex/DexOpcodes.h"
 #include "libdex/InstrUtils.h"
 
+#include "linkframe.h"
+#include "hashmap.h"
+
 
 /**
  *  Register Encoding Rules:
@@ -29,7 +32,6 @@ LinkFrame *linkstate = NULL;
 HashMap type_map;
 
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
-    LinkFrame *frame;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -90,7 +92,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
             result_reg[1] = regs[inst.vA+1];
         } else {
             result_reg[0] = regs[inst.vA];
-            result_reg[1] = NULL;
+            result_reg[1] = 0;
         }
         // Fall Through
     }
@@ -101,9 +103,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
             dprintf(2, "Error: Return from nowhere!\n");
             exit(-1);
         }
-        frame = popFrame(linkstate);
-        restoreFrame(frame, regs);
-        return frame->pc;
+        return (const u2*)restoreFrame(&linkstate, regs);
     }
     case OP_INVOKE:
     {
