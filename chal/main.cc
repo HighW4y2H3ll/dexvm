@@ -7,6 +7,64 @@
 #include "libdex/SysUtil.h"
 #include "libdex/DexFile.h"
 #include "libdex/DexClass.h"
+#include "libdex/DexOpcodes.h"
+#include "libdex/InstrUtils.h"
+
+
+/**
+ *  Register Encoding Rules:
+ *  - int, float are 32bit, encoded in the higher part (N << 32)
+ *  - double are 64bit, encoded into 2 regs, both only take the higher half
+ *  - objects are 8 bytes aligned, use the lower bits to encode type
+ */
+size_t regs[65536] = {0};
+size_t result_reg[2] = {0};
+
+const u2 *execute_one(const u2 *insns, u4 insn_size) {
+    Opcode op;
+    DecodedInstruction inst;
+    op = dexOpcodeFromCodeUnit(insns[0]);
+
+    dexDecodeInstruction(insns, &inst);
+
+    switch (inst.opcode) {
+    case OP_MOVE:
+    case OP_MOVE_FROM16:
+    case OP_MOVE_16:
+    case OP_MOVE_OBJECT:
+    case OP_MOVE_OBJECT_FROM16:
+    case OP_MOVE_OBJECT_16:
+    {
+        // Check Type
+        regs[inst.vA] = regs[inst.vB];
+        break;
+    }
+    case OP_MOVE_WIDE:
+    case OP_MOVE_WIDE_FROM16:
+    case OP_MOVE_WIDE_16:
+    case OP_NOP:
+    {
+        // Handle overlapping move-wide v6, v7; && move-wide v7, v6;
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
+
+    return &insns[dexGetWidthFromOpcode(op)];
+}
+
+// Entry for VM
+void run(const u2 *insns, u4 insn_size) {
+
+    // Expected to run a trace to deduce the number of loops unrolled
+    if (insn_size > 0) {
+        insn_size -= dexGetWidthFromInstruction(insns);
+        insns = execute_one(insns, insn_size);
+    }
+}
 
 
 int main(int argc, char** argv) {
@@ -101,7 +159,8 @@ int main(int argc, char** argv) {
         dprintf(2, "try # : %x\n", maincode->triesSize);
         dprintf(2, "dbginfo off : %x\n", maincode->debugInfoOff);
 
-        //run();
+        // Run VM
+        run(maincode->insns, maincode->insnsSize);
 
         free(class_data);
     }
