@@ -10,7 +10,8 @@ public class Min {
     //public static void main(String[] args) {
     //}
     public static int foo(int i, int j) {
-        int z = i;
+        int z = foo(1,2);
+        double fz = 0.1234567;
         if (i == 0) {
             return i + 1;
         } else {

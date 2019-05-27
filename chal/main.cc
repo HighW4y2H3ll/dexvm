@@ -17,10 +17,19 @@
  *  - double are 64bit, encoded into 2 regs, both only take the higher half
  *  - objects are 8 bytes aligned, use the lower bits to encode type
  */
-size_t regs[65536] = {0};
+size_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
 size_t result_reg[2] = {0};
+size_t xreg = 0;    // Exception Object Register
+
+// Link Frame to store the context info inside invoke/call
+// The Current link state in (nested) subroutine
+LinkFrame *linkstate = NULL;
+
+// Dex could handle at most 2^32 class, should be enough to encode this in 8 bytes
+HashMap type_map;
 
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
+    LinkFrame *frame;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -35,18 +44,72 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_MOVE_OBJECT_FROM16:
     case OP_MOVE_OBJECT_16:
     {
-        // Check Type
+        // Check Type?
         regs[inst.vA] = regs[inst.vB];
         break;
     }
+    case OP_MOVE_RESULT:
+    case OP_MOVE_RESULT_OBJECT:
+    {
+        // Check Type?
+        regs[inst.vA] = result_reg[0];
+        break;
+    }
+    case OP_MOVE_RESULT_WIDE:
+    {
+        regs[inst.vA] = result_reg[0];
+        regs[inst.vA+1] = result_reg[1];
+        break;
+    }
+    // WIDE reg pair is incremental, vN represents (vN, vN+1)
     case OP_MOVE_WIDE:
     case OP_MOVE_WIDE_FROM16:
     case OP_MOVE_WIDE_16:
-    case OP_NOP:
     {
         // Handle overlapping move-wide v6, v7; && move-wide v7, v6;
+        if (inst.vA > inst.vB) {
+            regs[inst.vA+1] = regs[inst.vB+1];
+            regs[inst.vA] = regs[inst.vB];
+        } else {
+            regs[inst.vA] = regs[inst.vB];
+            regs[inst.vA+1] = regs[inst.vB+1];
+        }
         break;
     }
+    case OP_MOVE_EXCEPTION:
+    {
+        regs[inst.vA] = xreg;
+        break;
+    }
+    case OP_RETURN:
+    case OP_RETURN_OBJECT:
+    case OP_RETURN_WIDE:
+    {
+        if (inst.opcode == OP_RETURN_WIDE) {
+            result_reg[0] = regs[inst.vA];
+            result_reg[1] = regs[inst.vA+1];
+        } else {
+            result_reg[0] = regs[inst.vA];
+            result_reg[1] = NULL;
+        }
+        // Fall Through
+    }
+    case OP_RETURN_VOID:
+    {
+        // Restore the register set
+        if (!linkstate) {
+            dprintf(2, "Error: Return from nowhere!\n");
+            exit(-1);
+        }
+        frame = popFrame(linkstate);
+        restoreFrame(frame, regs);
+        return frame->pc;
+    }
+    case OP_INVOKE:
+    {
+        // Stash the register set
+    }
+    case OP_NOP:
     default:
     {
         break;
