@@ -5,10 +5,16 @@ TESTDIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 	javac $<
 
 %.dex : %.class
-	${TESTDIR}/../android-sdk/build-tools/28.0.3/dx --dex --no-optimize --output=$@ $<
+	${TESTDIR}/../android-sdk/build-tools/28.0.3/dx --dex --output=$@ $<
 
 
+.PHONY : Min
 Min : Min.class Min.dex
+
+.PHONY : Debug
+Debug :
+	javac Debug.java
+	${TESTDIR}/../android-sdk/build-tools/28.0.3/dx --dex --no-optimize --output=Debug.dex Debug.class
 
 
 .PHONY : clean

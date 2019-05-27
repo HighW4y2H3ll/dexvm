@@ -2,3 +2,4 @@ chal/build
 android-sdk
 test/*.class
 test/*.dex
+.*.swp
