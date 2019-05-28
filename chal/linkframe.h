@@ -1,4 +1,6 @@
 
+#include <stdlib.h>
+
 struct LinkEntry {
     size_t regno;
     size_t regval;

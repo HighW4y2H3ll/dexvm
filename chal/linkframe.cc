@@ -1,6 +1,8 @@
 
 #include "linkframe.h"
 
+#include <string.h>
+
 void *restoreFrame(LinkFrame **curframe, size_t *regset) {
     void *pc = NULL;
     LinkEntry *lent = NULL;
@@ -34,16 +36,16 @@ void stashFrame(size_t *regset, void *pc, LinkFrame **curframe) {
     LinkEntry *lent = NULL;
     LinkFrame *frame = NULL;
 
-    frame = malloc(sizeof(LinkFrame));
+    frame = (LinkFrame*)malloc(sizeof(LinkFrame));
     frame->reg = NULL;
     frame->pc = pc;
     frame->next = *curframe;
     *curframe = frame;
 
     // Scan through all regs, only store Non-Null regs
-    for (idx = 0; idx < 65537; i++) {
+    for (idx = 0; idx < 65537; idx++) {
         if (regset[idx]) {
-            lent = malloc(sizeof(LinkEntry));
+            lent = (LinkEntry*)malloc(sizeof(LinkEntry));
 
             lent->next = frame->reg;
             frame->reg = lent;

@@ -12,6 +12,7 @@
 
 #include "linkframe.h"
 #include "hashmap.h"
+#include "encode.h"
 
 
 /**
@@ -20,7 +21,7 @@
  *  - double are 64bit, encoded into 2 regs, both only take the higher half
  *  - objects are 8 bytes aligned, use the lower bits to encode type
  */
-size_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
+size_t regs[65537] = {0};
 size_t result_reg[2] = {0};
 size_t xreg = 0;    // Exception Object Register
 
@@ -104,6 +105,81 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
             exit(-1);
         }
         return (const u2*)restoreFrame(&linkstate, regs);
+    }
+    /**
+     * Encoding for number <= 32bit
+     *
+     * low                         high     Memory
+     *  |_____________|_____________|       64 bit
+     *       tag      |    number   |
+     *                       | high16
+     */
+    case OP_CONST_4:
+    case OP_CONST_16:
+    case OP_CONST:
+    {
+        regs[inst.vA] = EncodeType(inst.vB, SINT);
+        break;
+    }
+    case OP_CONST_UINT:
+    {
+        regs[inst.vA] = EncodeType(inst.vB, UINT);
+        break;
+    }
+    case OP_CONST_HIGH16:
+    {
+        regs[inst.vA] = EncodeType(inst.vB << 16, SINT);
+        break;
+    }
+    /**
+     * Encoding for wide number (64bit)
+     *
+     *               vN                                 vN+1
+     * low                         high                                high        Memory
+     *  |_____________|_____________|       |_____________|_____________|          2 reg
+     *       tag      |    low 32   |       |     tag     |   high 32   |
+     *                                                           | high16
+     */
+    case OP_CONST_WIDE_16:
+    case OP_CONST_WIDE_32:
+    {
+        regs[inst.vA] = EncodeType(inst.vB, SINT);
+        if (inst.vB & (1 << 31)) {
+            regs[inst.vA+1] = EncodeType(-1, SINT);
+        } else {
+            regs[inst.vA+1] = EncodeType(0, SINT);
+        }
+        break;
+    }
+    case OP_CONST_WIDE:
+    {
+        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, DOUBLE);
+        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, DOUBLE);
+        break;
+    }
+    case OP_CONST_WIDE_SLONG:
+    {
+        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, SWINT);
+        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, SWINT);
+        break;
+    }
+    case OP_CONST_WIDE_ULONG:
+    {
+        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, UWINT);
+        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, UWINT);
+        break;
+    }
+    case OP_CONST_WIDE_HIGH16:
+    {
+        regs[inst.vA] = EncodeType(0, SWINT);
+        regs[inst.vA+1] = EncodeType(inst.vB << 16, SWINT);
+        break;
+    }
+    case OP_CONST_STRING:
+    case OP_CONST_STRING_JUMBO:
+    case OP_CONST_CLASS:
+    {
+        break;
     }
     case OP_INVOKE:
     {
