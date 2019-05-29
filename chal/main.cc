@@ -334,8 +334,8 @@ int main(int argc, char** argv) {
 
         // Make sure we have enough methods
         if (class_data->header.directMethodsSize < 2) {
-            dprintf(2, "Too few Methods\n");
-            return -1;
+            //dprintf(2, "Too few Methods\n");
+            continue;
         }
 
         for (mit = 0; mit < class_data->header.directMethodsSize; mit++) {
