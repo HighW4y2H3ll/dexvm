@@ -254,8 +254,25 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     return &insns[dexGetWidthFromOpcode(op)];
 }
 
+
+// Initialization For Each Run
+void init() {
+    // Zero out all regs before every run
+    memset(regs, 0, 65537*sizeof(size_t));
+    memset(result_reg, 0, 2*sizeof(size_t));
+    xreg = 0;
+
+    // Check Link State
+    if (linkstate) {
+        dprintf(2, "Stack Not Cleaned?!");
+        exit(-1);
+    }
+}
+
 // Entry for VM
 void run(const u2 *insns, u4 insn_size) {
+
+    init();
 
     // Expected to run a trace to deduce the number of loops unrolled
 #define EXEC_LOOP   \
