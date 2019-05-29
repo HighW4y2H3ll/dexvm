@@ -1,6 +1,7 @@
 
 #include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
 
@@ -14,6 +15,8 @@
 #include "hashmap.h"
 #include "encode.h"
 
+
+DexFile *dexfile = NULL;
 
 /**
  *  Register Encoding Rules:
@@ -39,6 +42,8 @@ void DumpInst(DecodedInstruction *inst) {
 }
 
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
+    const char *buf;
+    char *strptr;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -209,14 +214,36 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     }
     case OP_CONST_STRING:
     case OP_CONST_STRING_JUMBO:
-    case OP_CONST_CLASS:
     {
+        CheckTypeOrUndef(&regs[inst.vA], STRING);
+
+        buf = dexStringById(dexfile, inst.vB);
+        strptr = (char*)malloc(strlen(buf));
+        strcpy(strptr, buf);
+
+        regs[inst.vA] = EncodeType((size_t)strptr, STRING);
+        break;
+    }
+    case OP_CONST_CLASS:
+    case OP_NEW_INSTANCE:
+    {
+        buf = dexStringByTypeIdx(dexfile, inst.vB);
+        if (buf[0] != 'L') {
+            dprintf(2, "Error: Expected Class Descriptor\n");
+            exit(-1);
+        }
+        dprintf(2, "class %s\n", buf);
         break;
     }
     //case OP_INVOKE:
     //{
     //    // Stash the register set
     //}
+    case OP_ARRAY_LENGTH:
+    case OP_INSTANCE_OF:
+    case OP_CHECK_CAST:
+    case OP_MONITOR_ENTER:
+    case OP_MONITOR_EXIT:
     case OP_NOP:
     default:
     {
@@ -251,7 +278,6 @@ int main(int argc, char** argv) {
     struct stat st;
     MemMapping pmap;
     int dexfd;
-    DexFile *dexfile;
     u4 idx = 0;
     const DexClassDef *cls = NULL;
     const u1 *dat = NULL;

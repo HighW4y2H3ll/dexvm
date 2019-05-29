@@ -14,7 +14,7 @@ Min : Min.class Min.dex
 .PHONY : Debug
 Debug :
 	javac Debug.java
-	${TESTDIR}/../android-sdk/build-tools/28.0.3/dx --dex --no-optimize --output=Debug.dex Debug.class
+	${TESTDIR}/../android-sdk/build-tools/28.0.3/dx --dex --no-optimize --output=Debug.dex Debug\$$Nested.class Debug.class
 
 
 .PHONY : clean

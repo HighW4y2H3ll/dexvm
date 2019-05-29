@@ -1,11 +1,32 @@
 
-public class Debug {
+public class Debug extends Object {
+
+    int var;
+
+    public class Nested {
+        int i;
+        int j;
+    }
+
     public Debug() {
         System.out.println("h");
         System.out.println("e");
         System.out.println("l");
         System.out.println("l");
+        System.out.println("12345678");
+        System.out.println("1234567812345678");
         System.out.println("o");
+        int i = 22;
+        int j = 11;
+        int z = foo(1,2);
+        Nested n = new Nested();
+        double fz = 0.1234567;
+        if (i == 0) {
+            z = i + 1;
+        } else {
+            z = i + j;
+        }
+        var = z;
     }
     //public static void main(String[] args) {
     //}

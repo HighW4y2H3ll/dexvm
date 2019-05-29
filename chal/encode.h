@@ -24,7 +24,11 @@
 }
 
 size_t EncodeType(size_t n, size_t code) {
-    return ((n << 32)|code);
+    if (MASK_OBJECT(code)) {
+        return (n|code);
+    } else {
+        return ((n << 32)|code);
+    }
 }
 
 void CheckTypeOrUndef(size_t *regA, size_t mask) {
