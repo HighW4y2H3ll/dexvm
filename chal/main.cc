@@ -231,10 +231,18 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
 void run(const u2 *insns, u4 insn_size) {
 
     // Expected to run a trace to deduce the number of loops unrolled
-    if (insn_size > 0) {
-        insn_size -= dexGetWidthFromInstruction(insns);
-        insns = execute_one(insns, insn_size);
+#define EXEC_LOOP   \
+    if (insn_size > 0) {                                \
+        insn_size -= dexGetWidthFromInstruction(insns); \
+        insns = execute_one(insns, insn_size);          \
     }
+#define LOOP2(X)    \
+    X   \
+    X
+#define LOOP4(X)    LOOP2(LOOP2(X))
+#define LOOP16(X)   LOOP4(LOOP4(X))
+#define LOOP256(X)  LOOP16(LOOP16(X))
+    LOOP256(EXEC_LOOP);
 }
 
 
