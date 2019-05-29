@@ -21,7 +21,7 @@
  *  - double are 64bit, encoded into 2 regs, both only take the higher half
  *  - objects are 8 bytes aligned, use the lower bits to encode type
  */
-size_t regs[65537] = {0};
+size_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
 size_t result_reg[2] = {0};
 size_t xreg = 0;    // Exception Object Register
 
@@ -32,12 +32,20 @@ LinkFrame *linkstate = NULL;
 // Dex could handle at most 2^32 class, should be enough to encode this in 8 bytes
 HashMap type_map;
 
+
+
+void DumpInst(DecodedInstruction *inst) {
+    dprintf(2, "%s %d %d\n", dexGetOpcodeName(inst->opcode), inst->vA, inst->vB);
+}
+
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
 
     dexDecodeInstruction(insns, &inst);
+
+    DumpInst(&inst);
 
     switch (inst.opcode) {
     case OP_MOVE:
@@ -47,19 +55,20 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_MOVE_OBJECT_FROM16:
     case OP_MOVE_OBJECT_16:
     {
-        // Check Type?
+        TypeCheck(&regs[inst.vA], &regs[inst.vB]);
         regs[inst.vA] = regs[inst.vB];
         break;
     }
     case OP_MOVE_RESULT:
     case OP_MOVE_RESULT_OBJECT:
     {
-        // Check Type?
+        TypeCheck(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
         break;
     }
     case OP_MOVE_RESULT_WIDE:
     {
+        TypeCheck(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
         regs[inst.vA+1] = result_reg[1];
         break;
@@ -69,6 +78,8 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_MOVE_WIDE_FROM16:
     case OP_MOVE_WIDE_16:
     {
+        TypeCheck(&regs[inst.vA], &regs[inst.vB]);
+
         // Handle overlapping move-wide v6, v7; && move-wide v7, v6;
         if (inst.vA > inst.vB) {
             regs[inst.vA+1] = regs[inst.vB+1];
@@ -81,6 +92,8 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     }
     case OP_MOVE_EXCEPTION:
     {
+        CheckTypeOrUndef(&xreg, OBJECT);
+        CheckTypeOrUndef(&regs[inst.vA], OBJECT);
         regs[inst.vA] = xreg;
         break;
     }
@@ -88,6 +101,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_RETURN_OBJECT:
     case OP_RETURN_WIDE:
     {
+        // Type Check is done in OP_MOVE_RESULT
         if (inst.opcode == OP_RETURN_WIDE) {
             result_reg[0] = regs[inst.vA];
             result_reg[1] = regs[inst.vA+1];
@@ -118,16 +132,19 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_CONST_16:
     case OP_CONST:
     {
+        CheckTypeOrUndef(&regs[inst.vA], SINT);
         regs[inst.vA] = EncodeType(inst.vB, SINT);
         break;
     }
     case OP_CONST_UINT:
     {
+        CheckTypeOrUndef(&regs[inst.vA], UINT);
         regs[inst.vA] = EncodeType(inst.vB, UINT);
         break;
     }
     case OP_CONST_HIGH16:
     {
+        CheckTypeOrUndef(&regs[inst.vA], SINT);
         regs[inst.vA] = EncodeType(inst.vB << 16, SINT);
         break;
     }
@@ -143,6 +160,9 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_CONST_WIDE_16:
     case OP_CONST_WIDE_32:
     {
+        CheckTypeOrUndef(&regs[inst.vA], SINT);
+        CheckTypeOrUndef(&regs[inst.vA+1], SINT);
+
         regs[inst.vA] = EncodeType(inst.vB, SINT);
         if (inst.vB & (1 << 31)) {
             regs[inst.vA+1] = EncodeType(-1, SINT);
@@ -153,24 +173,36 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     }
     case OP_CONST_WIDE:
     {
+        CheckTypeOrUndef(&regs[inst.vA], DOUBLE);
+        CheckTypeOrUndef(&regs[inst.vA+1], DOUBLE);
+
         regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, DOUBLE);
         regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, DOUBLE);
         break;
     }
     case OP_CONST_WIDE_SLONG:
     {
+        CheckTypeOrUndef(&regs[inst.vA], SWINT);
+        CheckTypeOrUndef(&regs[inst.vA+1], SWINT);
+
         regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, SWINT);
         regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, SWINT);
         break;
     }
     case OP_CONST_WIDE_ULONG:
     {
+        CheckTypeOrUndef(&regs[inst.vA], UWINT);
+        CheckTypeOrUndef(&regs[inst.vA+1], UWINT);
+
         regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, UWINT);
         regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, UWINT);
         break;
     }
     case OP_CONST_WIDE_HIGH16:
     {
+        CheckTypeOrUndef(&regs[inst.vA], SWINT);
+        CheckTypeOrUndef(&regs[inst.vA+1], SWINT);
+
         regs[inst.vA] = EncodeType(0, SWINT);
         regs[inst.vA+1] = EncodeType(inst.vB << 16, SWINT);
         break;
@@ -181,10 +213,10 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     {
         break;
     }
-    case OP_INVOKE:
-    {
-        // Stash the register set
-    }
+    //case OP_INVOKE:
+    //{
+    //    // Stash the register set
+    //}
     case OP_NOP:
     default:
     {
