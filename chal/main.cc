@@ -32,18 +32,73 @@ size_t xreg = 0;    // Exception Object Register
 // The Current link state in (nested) subroutine
 LinkFrame *linkstate = NULL;
 
-// Dex could handle at most 2^32 class, should be enough to encode this in 8 bytes
-HashMap type_map;
-
-
 
 void DumpInst(DecodedInstruction *inst) {
     dprintf(2, "%s %d %d\n", dexGetOpcodeName(inst->opcode), inst->vA, inst->vB);
 }
 
+
+const DexClassDef *getClassDefByTypeIdx(u4 idx) {
+    int i = 0;
+    const DexClassDef *cls = NULL;
+    const char *buf = dexStringByTypeIdx(dexfile, idx);
+
+    if (buf[0] != 'L') {
+        dprintf(2, "Error: Expected Class Descriptor\n");
+        exit(-1);
+    }
+
+    for (i = 0; i < dexfile->pHeader->classDefsSize; i++) {
+        cls = dexGetClassDef(dexfile, i);
+        if (cls->classIdx == idx) {
+            return cls;
+        }
+    }
+
+    return cls;
+}
+
+/**
+ *  Runtime Object
+ */
+struct RuntimeObject {
+    const DexClassData *type;
+    size_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+};
+
+// Dex could handle at most 2^32 class, should be enough to encode this in 8 bytes
+HashMap *type_map = NULL;
+
+DexClassData *findClassObject(const DexClassDef *cls) {
+    DexClassData *class_data = NULL;
+    const u1 *dat = dexGetClassData(dexfile, cls);
+
+    class_data = (DexClassData*)lookup(type_map, cls->classIdx);
+    if (class_data)
+        return (DexClassData*)class_data;
+
+    class_data = dexReadAndVerifyClassData(&dat, NULL);
+    insert(type_map, cls->classIdx, (size_t)class_data);
+    return class_data;
+}
+
+RuntimeObject *newClassObject(const DexClassDef *cls) {
+    size_t sz = 0;
+    RuntimeObject *obj = NULL;
+    DexClassData *class_data = findClassObject(cls);
+
+    sz = sizeof(RuntimeObject) + 2*sizeof(size_t)*class_data->header.instanceFieldsSize;
+    obj = (RuntimeObject*)malloc(sz);
+
+    memset(obj, 0, sz);
+    obj->type = class_data;
+    return obj;
+}
+
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
     const char *buf;
     char *strptr;
+    const DexClassDef *class_def = NULL;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -227,12 +282,11 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_CONST_CLASS:
     case OP_NEW_INSTANCE:
     {
-        buf = dexStringByTypeIdx(dexfile, inst.vB);
-        if (buf[0] != 'L') {
-            dprintf(2, "Error: Expected Class Descriptor\n");
-            exit(-1);
-        }
-        dprintf(2, "class %s\n", buf);
+        class_def = getClassDefByTypeIdx(inst.vB);
+        RuntimeObject *obj = newClassObject(class_def);
+        //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
+        //        obj->type->header.instanceFieldsSize, obj);
+        regs[inst.vA] = EncodeType((size_t)obj, OBJECT);
         break;
     }
     //case OP_INVOKE:
@@ -297,8 +351,8 @@ int main(int argc, char** argv) {
     int dexfd;
     u4 idx = 0;
     const DexClassDef *cls = NULL;
-    const u1 *dat = NULL;
     DexClassData *class_data = NULL;
+    HashEntry *hashentry = NULL;
     DexMethod meth;
     const DexCode *code = NULL;
     const DexCode *maincode = NULL;
@@ -328,6 +382,9 @@ int main(int argc, char** argv) {
 
     dexfile = dexFileParse((unsigned char *)pmap.addr, pmap.length, kDexParseVerifyChecksum);
 
+    // Init Object Type Map
+    type_map = (HashMap*)malloc(sizeof(HashMap));
+    memset(type_map, 0, sizeof(HashMap));
 
     dprintf(2, "methodsz: %d\n", dexfile->pHeader->methodIdsSize);
     dprintf(2, "classsz: %d\n", dexfile->pHeader->classDefsSize);
@@ -341,8 +398,7 @@ int main(int argc, char** argv) {
         if (cls->accessFlags != ACC_PUBLIC)
             continue;
 
-        dat = dexGetClassData(dexfile, cls);
-        class_data = dexReadAndVerifyClassData(&dat, NULL);
+        class_data = findClassObject(cls);
 
         dprintf(2, "staticfieldsz: %d\n", class_data->header.staticFieldsSize);
         dprintf(2, "instancefieldssz: %d\n", class_data->header.instanceFieldsSize);
@@ -383,10 +439,21 @@ int main(int argc, char** argv) {
 
         // Run VM
         run(maincode->insns, maincode->insnsSize);
-
-        free(class_data);
     }
 
+    // Check linkstate
+    if (linkstate) {
+        dprintf(2, "Stack Not Cleaned?!");
+        exit(-1);
+    }
+    // Release Object Type Map
+    while (type_map->root) {
+        hashentry = type_map->root;
+        type_map->root = hashentry->next;
+        free((DexClassData*)hashentry->data);
+        free(hashentry);
+    }
+    free(type_map);
 
     dexFileFree(dexfile);
 

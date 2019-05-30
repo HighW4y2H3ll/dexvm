@@ -9,6 +9,7 @@ public class Debug extends Object {
     }
 
     public Debug() {
+        Nested n = new Nested();
         System.out.println("h");
         System.out.println("e");
         System.out.println("l");
@@ -19,7 +20,6 @@ public class Debug extends Object {
         int i = 22;
         int j = 11;
         int z = foo(1,2);
-        Nested n = new Nested();
         double fz = 0.1234567;
         if (i == 0) {
             z = i + 1;
