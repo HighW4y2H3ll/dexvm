@@ -66,7 +66,7 @@ struct RuntimeObject {
     size_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
 };
 
-// Dex could handle at most 2^32 class, should be enough to encode this in 8 bytes
+// Dex could handle at most 2^32 class
 HashMap *type_map = NULL;
 
 DexClassData *findClassObject(const DexClassDef *cls) {
@@ -99,6 +99,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     const char *buf;
     char *strptr;
     const DexClassDef *class_def = NULL;
+    RuntimeObject *obj = NULL;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -283,7 +284,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_NEW_INSTANCE:
     {
         class_def = getClassDefByTypeIdx(inst.vB);
-        RuntimeObject *obj = newClassObject(class_def);
+        obj = newClassObject(class_def);
         //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
         //        obj->type->header.instanceFieldsSize, obj);
         regs[inst.vA] = EncodeType((size_t)obj, OBJECT);
