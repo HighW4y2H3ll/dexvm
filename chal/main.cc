@@ -283,6 +283,8 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_CONST_CLASS:
     case OP_NEW_INSTANCE:
     {
+        CheckTypeOrUndef(&regs[inst.vA], OBJECT);
+
         class_def = getClassDefByTypeIdx(inst.vB);
         obj = newClassObject(class_def);
         //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
