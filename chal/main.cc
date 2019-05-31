@@ -105,6 +105,10 @@ ArrayObject *newArrayObject(size_t len, size_t typeidx) {
     size_t sz = sizeof(ArrayObject) + 2*sizeof(size_t)*len;
 
     // !!! Integer Overflow 0x01000001 ==> Array(16)
+    //if (sz & 0xff000000) {
+    //    dprintf(2, "!!! Int Overflow\n");
+    //    exit(-1);
+    //}
 
     obj = (ArrayObject*)malloc(sz);
     memset(obj, 0, sz);
@@ -144,6 +148,7 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
     RuntimeObject *obj = NULL;
     DexClassData *class_data = findClassObject(cls);
 
+    // !!! Need 0x0100 0000 0000 0001 to Int overflow - probably too big to actually worry about
     sz = sizeof(RuntimeObject) + 2*sizeof(size_t)*class_data->header.instanceFieldsSize;
     obj = (RuntimeObject*)malloc(sz);
 
