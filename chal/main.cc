@@ -174,20 +174,20 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_MOVE_OBJECT_FROM16:
     case OP_MOVE_OBJECT_16:
     {
-        TypeCheck(&regs[inst.vA], &regs[inst.vB]);
+        CheckTypeEq(&regs[inst.vA], &regs[inst.vB]);
         regs[inst.vA] = regs[inst.vB];
         break;
     }
     case OP_MOVE_RESULT:
     case OP_MOVE_RESULT_OBJECT:
     {
-        TypeCheck(&regs[inst.vA], &result_reg[0]);
+        CheckTypeEq(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
         break;
     }
     case OP_MOVE_RESULT_WIDE:
     {
-        TypeCheck(&regs[inst.vA], &result_reg[0]);
+        CheckTypeEq(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
         regs[inst.vA+1] = result_reg[1];
         break;
@@ -197,7 +197,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     case OP_MOVE_WIDE_FROM16:
     case OP_MOVE_WIDE_16:
     {
-        TypeCheck(&regs[inst.vA], &regs[inst.vB]);
+        CheckTypeEq(&regs[inst.vA], &regs[inst.vB]);
 
         // Handle overlapping move-wide v6, v7; && move-wide v7, v6;
         if (inst.vA > inst.vB) {
@@ -354,7 +354,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     {
         CheckTypeOrUndef(&regs[inst.vA], ARRAY);
 
-        sz = getSInt(regs, inst.vB);
+        sz = getDataChecked(regs, inst.vB, SINT);
         arr = newArrayObject(sz, inst.vC);
         //dprintf(2, "ARRAY %d - %p - %x\n", sz, arr, arr->typecode);
         regs[inst.vA] = EncodeType((size_t)arr, ARRAY);
@@ -363,12 +363,23 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     }
     case OP_ARRAY_LENGTH:
     {
+        CheckType(&regs[inst.vB], ARRAY);
+        arr = (ArrayObject*)getDataChecked(regs, inst.vB, ARRAY);
+        CheckTypeOrUndef(&regs[inst.vA], SINT);
+        regs[inst.vA] = EncodeType((size_t)arr->size, SINT);
+        break;
+    }
+    case OP_THROW:
+    {
         break;
     }
     //case OP_INVOKE:
     //{
     //    // Stash the register set
     //}
+    case OP_FILLED_NEW_ARRAY:
+    case OP_FILLED_NEW_ARRAY_RANGE:
+    case OP_FILL_ARRAY_DATA:
     case OP_INSTANCE_OF:
     case OP_CHECK_CAST:
     case OP_MONITOR_ENTER:

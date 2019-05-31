@@ -42,8 +42,16 @@ void CheckTypeOrUndef(size_t *regA, size_t mask) {
     }
 }
 
+void CheckType(size_t *regA, size_t mask) {
+    ERROR_TYPE_CHECK(!(regA[0] & mask));
+
+    if (!MASK_WIDE(mask)) {
+        ERROR_TYPE_CHECK(!(regA[1] & mask));
+    }
+}
+
 // Check 2 (wide) registers are of the same type
-void TypeCheck(size_t *regA, size_t *regB) {
+void CheckTypeEq(size_t *regA, size_t *regB) {
     // regA is undefined
     if (!regA[0])   return;
 
@@ -65,7 +73,8 @@ void TypeCheck(size_t *regA, size_t *regB) {
 }
 
 // Extract Data from it's encoded form
-size_t getSInt(size_t *reg, size_t idx) {
-    ERROR_TYPE_CHECK(!(reg[idx] & SINT));
+size_t getDataChecked(size_t *reg, size_t idx, size_t mask) {
+    ERROR_TYPE_CHECK(!(reg[idx] & mask));
     return reg[idx] >> 32;
 }
+
