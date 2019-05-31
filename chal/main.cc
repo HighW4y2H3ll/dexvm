@@ -104,12 +104,6 @@ ArrayObject *newArrayObject(size_t len, size_t typeidx) {
     ArrayObject *obj = NULL;
     size_t sz = sizeof(ArrayObject) + 2*sizeof(size_t)*len;
 
-    // !!! Integer Overflow 0x01000001 ==> Array(16)
-    //if (sz & 0xff000000) {
-    //    dprintf(2, "!!! Int Overflow\n");
-    //    exit(-1);
-    //}
-
     obj = (ArrayObject*)malloc(sz);
     memset(obj, 0, sz);
 
@@ -367,11 +361,14 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
 
         break;
     }
+    case OP_ARRAY_LENGTH:
+    {
+        break;
+    }
     //case OP_INVOKE:
     //{
     //    // Stash the register set
     //}
-    case OP_ARRAY_LENGTH:
     case OP_INSTANCE_OF:
     case OP_CHECK_CAST:
     case OP_MONITOR_ENTER:
