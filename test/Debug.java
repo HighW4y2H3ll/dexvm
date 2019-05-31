@@ -9,6 +9,9 @@ public class Debug extends Object {
     }
 
     public Debug() {
+        boolean[] ib = new boolean[20];
+        Nested[] na = new Nested[10];
+        int[] ia = new int[20];
         Nested n = new Nested();
         System.out.println("h");
         System.out.println("e");

@@ -63,3 +63,9 @@ void TypeCheck(size_t *regA, size_t *regB) {
             MASK_NUMBER(regA[1]) != MASK_NUMBER(regB[1])
           || MASK_NUMBER(regA[0]) != MASK_NUMBER(regA[1]));
 }
+
+// Extract Data from it's encoded form
+size_t getSInt(size_t *reg, size_t idx) {
+    ERROR_TYPE_CHECK(!(reg[idx] & SINT));
+    return reg[idx] >> 32;
+}

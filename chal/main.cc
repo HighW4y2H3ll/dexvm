@@ -58,6 +58,63 @@ const DexClassDef *getClassDefByTypeIdx(u4 idx) {
     return cls;
 }
 
+
+/**
+ *  Array Object
+ */
+struct ArrayObject {
+    size_t size;
+    size_t typecode;
+    size_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+};
+
+size_t getTypeCodeByTypdIdx(size_t idx) {
+    const char *buf = dexStringByTypeIdx(dexfile, idx);
+
+    if (buf[0] != '[') {
+        dprintf(2, "Error: Expected Array Descriptor\n");
+        exit(-1);
+    }
+
+    switch (buf[1]) {
+    case 'Z':
+    case 'B':
+    case 'S':
+    case 'I':
+        return SINT;
+    case 'C':
+        return UINT;
+    case 'J':
+        return SWINT;
+    case 'F':
+        return FLOAT;
+    case 'D':
+        return DOUBLE;
+    case 'L':
+        return OBJECT;
+    case '[':
+        return ARRAY;
+    default:
+        dprintf(2, "Error: Unknown Type Descriptor\n");
+        exit(-1);
+    }
+}
+
+ArrayObject *newArrayObject(size_t len, size_t typeidx) {
+    ArrayObject *obj = NULL;
+    size_t sz = sizeof(ArrayObject) + 2*sizeof(size_t)*len;
+
+    // !!! Integer Overflow 0x01000001 ==> Array(16)
+
+    obj = (ArrayObject*)malloc(sz);
+    memset(obj, 0, sz);
+
+    obj->size = len;
+    obj->typecode = getTypeCodeByTypdIdx(typeidx);
+    return obj;
+}
+
+
 /**
  *  Runtime Object
  */
@@ -98,8 +155,10 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
 const u2 *execute_one(const u2 *insns, u4 insn_size) {
     const char *buf;
     char *strptr;
+    size_t sz;
     const DexClassDef *class_def = NULL;
     RuntimeObject *obj = NULL;
+    ArrayObject *arr = NULL;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -290,6 +349,17 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
         //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
         //        obj->type->header.instanceFieldsSize, obj);
         regs[inst.vA] = EncodeType((size_t)obj, OBJECT);
+        break;
+    }
+    case OP_NEW_ARRAY:
+    {
+        CheckTypeOrUndef(&regs[inst.vA], ARRAY);
+
+        sz = getSInt(regs, inst.vB);
+        arr = newArrayObject(sz, inst.vC);
+        //dprintf(2, "ARRAY %d - %p - %x\n", sz, arr, arr->typecode);
+        regs[inst.vA] = EncodeType((size_t)arr, ARRAY);
+
         break;
     }
     //case OP_INVOKE:
