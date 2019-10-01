@@ -25,9 +25,9 @@ const DexCode *maincode = NULL;
  *  - double are 64bit, encoded into 2 regs, both only take the higher half
  *  - objects are 8 bytes aligned, use the lower bits to encode type
  */
-size_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
-size_t result_reg[2] = {0};
-size_t xreg = 0;    // Exception Object Register
+uint64_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
+uint64_t result_reg[2] = {0};
+uint64_t xreg = 0;    // Exception Object Register
 
 // Link Frame to store the context info inside invoke/call
 // The Current link state in (nested) subroutine
@@ -64,12 +64,12 @@ const DexClassDef *getClassDefByTypeIdx(u4 idx) {
  *  Array Object
  */
 struct ArrayObject {
-    size_t size;
-    size_t typecode;
-    size_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+    uint64_t size;
+    uint64_t typecode;
+    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
 };
 
-size_t getTypeCodeByTypdIdx(size_t idx) {
+uint64_t getTypeCodeByTypdIdx(uint64_t idx) {
     const char *buf = dexStringByTypeIdx(dexfile, idx);
 
     if (buf[0] != '[') {
@@ -101,9 +101,9 @@ size_t getTypeCodeByTypdIdx(size_t idx) {
     }
 }
 
-ArrayObject *newArrayObject(size_t len, size_t typeidx) {
+ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
     ArrayObject *obj = NULL;
-    size_t sz = sizeof(ArrayObject) + 2*sizeof(size_t)*len;
+    uint64_t sz = sizeof(ArrayObject) + 2*sizeof(uint64_t)*len;
 
     obj = (ArrayObject*)malloc(sz);
     memset(obj, 0, sz);
@@ -119,7 +119,7 @@ ArrayObject *newArrayObject(size_t len, size_t typeidx) {
  */
 struct RuntimeObject {
     const DexClassData *type;
-    size_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
 };
 
 // Dex could handle at most 2^32 class
@@ -134,17 +134,17 @@ DexClassData *findClassObject(const DexClassDef *cls) {
         return (DexClassData*)class_data;
 
     class_data = dexReadAndVerifyClassData(&dat, NULL);
-    insert(type_map, cls->classIdx, (size_t)class_data);
+    insert(type_map, cls->classIdx, (uint64_t)class_data);
     return class_data;
 }
 
 RuntimeObject *newClassObject(const DexClassDef *cls) {
-    size_t sz = 0;
+    uint64_t sz = 0;
     RuntimeObject *obj = NULL;
     DexClassData *class_data = findClassObject(cls);
 
     // !!! Need 0x0100 0000 0000 0001 to Int overflow - probably too big to actually worry about
-    sz = sizeof(RuntimeObject) + 2*sizeof(size_t)*class_data->header.instanceFieldsSize;
+    sz = sizeof(RuntimeObject) + 2*sizeof(uint64_t)*class_data->header.instanceFieldsSize;
     obj = (RuntimeObject*)malloc(sz);
 
     memset(obj, 0, sz);
@@ -155,7 +155,7 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
 const u2 *execute_one(const u2 *insns) {
     const char *buf;
     char *strptr;
-    size_t sz;
+    uint64_t sz;
     const DexClassDef *class_def = NULL;
     RuntimeObject *obj = NULL;
     ArrayObject *arr = NULL;
@@ -340,7 +340,7 @@ const u2 *execute_one(const u2 *insns) {
         strptr = (char*)malloc(strlen(buf));
         strcpy(strptr, buf);
 
-        regs[inst.vA] = EncodeType((size_t)strptr, STRING);
+        regs[inst.vA] = EncodeType((uint64_t)strptr, STRING);
         break;
     }
     case OP_CONST_CLASS:
@@ -352,7 +352,7 @@ const u2 *execute_one(const u2 *insns) {
         obj = newClassObject(class_def);
         //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
         //        obj->type->header.instanceFieldsSize, obj);
-        regs[inst.vA] = EncodeType((size_t)obj, OBJECT);
+        regs[inst.vA] = EncodeType((uint64_t)obj, OBJECT);
         break;
     }
     case OP_NEW_ARRAY:
@@ -362,7 +362,7 @@ const u2 *execute_one(const u2 *insns) {
         sz = getDataChecked(regs, inst.vB, SINT);
         arr = newArrayObject(sz, inst.vC);
         //dprintf(2, "ARRAY %d - %p - %x\n", sz, arr, arr->typecode);
-        regs[inst.vA] = EncodeType((size_t)arr, ARRAY);
+        regs[inst.vA] = EncodeType((uint64_t)arr, ARRAY);
 
         break;
     }
@@ -371,7 +371,7 @@ const u2 *execute_one(const u2 *insns) {
         CheckType(&regs[inst.vB], ARRAY);
         arr = (ArrayObject*)getDataChecked(regs, inst.vB, ARRAY);
         CheckTypeOrUndef(&regs[inst.vA], SINT);
-        regs[inst.vA] = EncodeType((size_t)arr->size, SINT);
+        regs[inst.vA] = EncodeType((uint64_t)arr->size, SINT);
         break;
     }
     case OP_THROW:
@@ -424,8 +424,8 @@ const u2 *execute_one(const u2 *insns) {
 // Initialization For Each Run
 void init() {
     // Zero out all regs before every run
-    memset(regs, 0, 65537*sizeof(size_t));
-    memset(result_reg, 0, 2*sizeof(size_t));
+    memset(regs, 0, 65537*sizeof(uint64_t));
+    memset(result_reg, 0, 2*sizeof(uint64_t));
     xreg = 0;
 
     // Check Link State

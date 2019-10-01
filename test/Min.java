@@ -12,6 +12,9 @@ public class Min {
     public static int foo(int i, int j) {
         int z = i;
         double fz = 0.1234567;
+        foo(1,2);
+        foo(1,2);
+        foo(1,2);
         if (i == 0) {
             return i + 1;
         } else {

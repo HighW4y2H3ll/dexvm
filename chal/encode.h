@@ -23,7 +23,7 @@
     exit(-1);                                   \
 }
 
-size_t EncodeType(size_t n, size_t code) {
+uint64_t EncodeType(uint64_t n, uint64_t code) {
     if (MASK_OBJECT(code)) {
         return (n|code);
     } else {
@@ -31,7 +31,7 @@ size_t EncodeType(size_t n, size_t code) {
     }
 }
 
-void CheckTypeOrUndef(size_t *regA, size_t mask) {
+void CheckTypeOrUndef(uint64_t *regA, uint64_t mask) {
     // Undefined
     if (!regA[0])   return;
 
@@ -42,7 +42,7 @@ void CheckTypeOrUndef(size_t *regA, size_t mask) {
     }
 }
 
-void CheckType(size_t *regA, size_t mask) {
+void CheckType(uint64_t *regA, uint64_t mask) {
     ERROR_TYPE_CHECK(!(regA[0] & mask));
 
     if (!MASK_WIDE(mask)) {
@@ -51,7 +51,7 @@ void CheckType(size_t *regA, size_t mask) {
 }
 
 // Check 2 (wide) registers are of the same type
-void CheckTypeEq(size_t *regA, size_t *regB) {
+void CheckTypeEq(uint64_t *regA, uint64_t *regB) {
     // regA is undefined
     if (!regA[0])   return;
 
@@ -73,7 +73,7 @@ void CheckTypeEq(size_t *regA, size_t *regB) {
 }
 
 // Extract Data from it's encoded form
-size_t getDataChecked(size_t *reg, size_t idx, size_t mask) {
+uint64_t getDataChecked(uint64_t *reg, uint64_t idx, uint64_t mask) {
     ERROR_TYPE_CHECK(!(reg[idx] & mask));
     return reg[idx] >> 32;
 }

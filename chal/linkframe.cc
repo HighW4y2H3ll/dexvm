@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-void *restoreFrame(LinkFrame **curframe, size_t *regset) {
+void *restoreFrame(LinkFrame **curframe, uint64_t *regset) {
     void *pc = NULL;
     LinkEntry *lent = NULL;
     LinkFrame *frame = *curframe;
@@ -16,7 +16,7 @@ void *restoreFrame(LinkFrame **curframe, size_t *regset) {
     pc = frame->pc;
 
     // Clean out all regs first
-    memset(regset, 0, 65537*sizeof(size_t));
+    memset(regset, 0, 65537*sizeof(uint64_t));
 
     // Restore Regs
     lent = frame->reg;
@@ -31,8 +31,8 @@ void *restoreFrame(LinkFrame **curframe, size_t *regset) {
     return pc;
 }
 
-void stashFrame(size_t *regset, void *pc, LinkFrame **curframe) {
-    size_t idx = 0;
+void stashFrame(uint64_t *regset, void *pc, LinkFrame **curframe) {
+    uint64_t idx = 0;
     LinkEntry *lent = NULL;
     LinkFrame *frame = NULL;
 
@@ -56,7 +56,7 @@ void stashFrame(size_t *regset, void *pc, LinkFrame **curframe) {
     }
 
     // Clean up regs
-    memset(regset, 0, 65537*sizeof(size_t));
+    memset(regset, 0, 65537*sizeof(uint64_t));
 }
 
 
