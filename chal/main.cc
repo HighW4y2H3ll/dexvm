@@ -17,6 +17,7 @@
 
 
 DexFile *dexfile = NULL;
+const DexCode *maincode = NULL;
 
 /**
  *  Register Encoding Rules:
@@ -151,7 +152,7 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
     return obj;
 }
 
-const u2 *execute_one(const u2 *insns, u4 insn_size) {
+const u2 *execute_one(const u2 *insns) {
     const char *buf;
     char *strptr;
     size_t sz;
@@ -183,6 +184,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     {
         CheckTypeEq(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
+        result_reg[0] = 0;
         break;
     }
     case OP_MOVE_RESULT_WIDE:
@@ -190,6 +192,8 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
         CheckTypeEq(&regs[inst.vA], &result_reg[0]);
         regs[inst.vA] = result_reg[0];
         regs[inst.vA+1] = result_reg[1];
+        result_reg[0] = 0;
+        result_reg[1] = 0;
         break;
     }
     // WIDE reg pair is incremental, vN represents (vN, vN+1)
@@ -214,6 +218,7 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
         CheckTypeOrUndef(&xreg, OBJECT);
         CheckTypeOrUndef(&regs[inst.vA], OBJECT);
         regs[inst.vA] = xreg;
+        xreg = 0;    // Null the xreg to clear the exception signal
         break;
     }
     case OP_RETURN:
@@ -371,12 +376,27 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     }
     case OP_THROW:
     {
+        CheckType(&regs[inst.vA], OBJECT|STRING|ARRAY);
+        xreg = regs[inst.vA];
         break;
+    }
+    case OP_GOTO:
+    case OP_GOTO_16:
+    case OP_GOTO_32:
+    {
+        return &insns[(s4)inst.vA]; // Sign Extend
     }
     //case OP_INVOKE:
     //{
     //    // Stash the register set
     //}
+    case OP_CMPL_FLOAT:
+    case OP_CMPG_FLOAT:
+    case OP_CMPL_DOUBLE:
+    case OP_CMPG_DOUBLE:
+    case OP_CMP_LONG:
+    case OP_PACKED_SWITCH:
+    case OP_SPARSE_SWITCH:
     case OP_FILLED_NEW_ARRAY:
     case OP_FILLED_NEW_ARRAY_RANGE:
     case OP_FILL_ARRAY_DATA:
@@ -389,6 +409,12 @@ const u2 *execute_one(const u2 *insns, u4 insn_size) {
     {
         break;
     }
+    }
+
+    // Handle Exception
+    if (xreg) {
+        const DexTry *tries = dexGetTries(maincode);
+        dexGetCatchHandlerData(maincode);
     }
 
     return &insns[dexGetWidthFromOpcode(op)];
@@ -416,9 +442,8 @@ void run(const u2 *insns, u4 insn_size) {
 
     // Expected to run a trace to deduce the number of loops unrolled
 #define EXEC_LOOP   \
-    if (insn_size > 0) {                                \
-        insn_size -= dexGetWidthFromInstruction(insns); \
-        insns = execute_one(insns, insn_size);          \
+    if (insns < &insns[insn_size]) {                    \
+        insns = execute_one(insns);                     \
     }
 #define LOOP2(X)    \
     X   \
@@ -441,7 +466,6 @@ int main(int argc, char** argv) {
     HashEntry *hashentry = NULL;
     DexMethod meth;
     const DexCode *code = NULL;
-    const DexCode *maincode = NULL;
     u4 mit = 0;
 
     if (argc < 2) {
@@ -503,12 +527,13 @@ int main(int argc, char** argv) {
 
             // Get Enough DUA in Method Body - at least 0x10*2 bytes
             code = dexGetCode(dexfile, &meth);
-            if (code->insnsSize < 0x10) {
+            if (code->insnsSize < CONF_SEMILAVA_MAGIC_1) {
                 dprintf(2, "Is that all you G0t?\n");
                 return -1;
             }
 
-            if (meth.accessFlags != (ACC_PUBLIC|ACC_CONSTRUCTOR)) {
+            // Skip Ctor
+            if (meth.accessFlags & ACC_CONSTRUCTOR) {
                 continue;
             }
 

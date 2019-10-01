@@ -11,19 +11,24 @@ public class Debug extends Object {
     public Debug() {
         boolean[] ib = new boolean[20];
         Nested[] na = new Nested[10];
+        try {
         int[] ia = new int[20];
         Nested n = new Nested();
         System.out.println("h");
         System.out.println("e");
         System.out.println("l");
         System.out.println("l");
+        } catch(Exception e) {
+            System.out.println("12345678");
+        }
         System.out.println("12345678");
         System.out.println("1234567812345678");
         System.out.println("o");
         int i = 22;
         int j = 11;
-        int z = foo(1,2);
-        double fz = 0.1234567;
+        //int z = foo(1,2);
+        int z = 1;
+        //double fz = 0.1234567;
         if (i == 0) {
             z = i + 1;
         } else {

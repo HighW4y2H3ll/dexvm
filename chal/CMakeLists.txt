@@ -26,6 +26,7 @@ add_library (libdex OBJECT
     )
 
 add_definitions (-DHAVE_POSIX_FILEMAP=1)
+add_definitions (-DCONF_SEMILAVA_MAGIC_1=0x0)
 
 add_executable (dexvm main.cc linkframe.cc)
 target_link_libraries (dexvm libdex z)

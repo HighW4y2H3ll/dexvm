@@ -1,11 +1,11 @@
 
 public class Min {
     public Min() {
-        System.out.println("h");
-        System.out.println("e");
-        System.out.println("l");
-        System.out.println("l");
-        System.out.println("o");
+        //System.out.println("h");
+        //System.out.println("e");
+        //System.out.println("l");
+        //System.out.println("l");
+        //System.out.println("o");
     }
     //public static void main(String[] args) {
     //}
