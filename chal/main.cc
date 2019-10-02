@@ -555,7 +555,11 @@ int main(int argc, char** argv) {
                 continue;
             }
 
-            maincode = code;
+            // Only do static public function
+            if ((meth.accessFlags & ACC_PUBLIC)
+              && (meth.accessFlags & ACC_STATIC)) {
+                maincode = code;
+            }
         }
 
         if (!maincode) {
