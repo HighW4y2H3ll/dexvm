@@ -75,7 +75,23 @@ void CheckTypeEq(uint64_t *regA, uint64_t *regB) {
 // Extract Data from it's encoded form
 uint64_t getDataChecked(uint64_t *reg, uint64_t idx, uint64_t mask) {
     ERROR_TYPE_CHECK(!(reg[idx] & mask));
-    return reg[idx] >> 32;
+    switch (mask) {
+    case OBJECT:
+    case STRING:
+    case ARRAY:
+        return reg[idx]&(~3);
+    case SINT:
+    case UINT:
+    case FLOAT:
+        return reg[idx] >> 32;
+    case DOUBLE:
+    case SWINT:
+    case UWINT:
+        ERROR_TYPE_CHECK(!(reg[idx+1] & mask));
+        return (reg[idx] >> 32) | (reg[idx+1] & (~0xffffffff));
+    default:
+        ERROR_TYPE_CHECK(1);
+    }
 }
 
 
