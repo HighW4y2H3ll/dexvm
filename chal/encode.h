@@ -90,6 +90,7 @@ bool NumCmpLt(uint64_t *regA, uint64_t *regB) {
     double da, db;
     int64_t wia, wib;
     uint64_t wua, wub;
+    uint64_t tmp;
 
     ERROR_TYPE_CHECK(MASK_OBJECT(regA[0]));
     ERROR_TYPE_CHECK(MASK_OBJECT(regB[0]));
@@ -104,12 +105,16 @@ bool NumCmpLt(uint64_t *regA, uint64_t *regB) {
         ub = getDataChecked(regB, 0, UINT);
         return ua < ub;
     case FLOAT:
-        fa = getDataChecked(regA, 0, FLOAT);
-        fb = getDataChecked(regB, 0, FLOAT);
+        tmp = getDataChecked(regA, 0, FLOAT);
+        fa = *(float*)&tmp;
+        tmp = getDataChecked(regB, 0, FLOAT);
+        fb = *(float*)&tmp;
         return fa < fb;
     case DOUBLE:
-        da = getDataChecked(regA, 0, DOUBLE);
-        db = getDataChecked(regB, 0, DOUBLE);
+        tmp = getDataChecked(regA, 0, DOUBLE);
+        da = *(double*)&tmp;
+        tmp = getDataChecked(regB, 0, DOUBLE);
+        db = *(double*)&tmp;
         return da < db;
     case SWINT:
         wia = getDataChecked(regA, 0, SWINT);
