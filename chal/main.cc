@@ -390,6 +390,24 @@ const u2 *execute_one(const u2 *insns) {
     //{
     //    // Stash the register set
     //}
+    case OP_IF_EQ:
+    case OP_IF_NE:
+    case OP_IF_LT:
+    case OP_IF_GE:
+    case OP_IF_GT:
+    case OP_IF_LE:
+    {
+        if (DecodeCmp(&regs[inst.vA], &regs[inst.vB], inst.opcode))
+            return &insns[(s4)inst.vC];  // Sign Extend
+        break;
+    }
+    case OP_IF_EQZ:
+    case OP_IF_NEZ:
+    case OP_IF_LTZ:
+    case OP_IF_GEZ:
+    case OP_IF_GTZ:
+    case OP_IF_LEZ:
+        break;
     case OP_CMPL_FLOAT:
     case OP_CMPG_FLOAT:
     case OP_CMPL_DOUBLE:

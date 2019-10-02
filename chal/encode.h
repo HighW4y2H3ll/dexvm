@@ -78,3 +78,70 @@ uint64_t getDataChecked(uint64_t *reg, uint64_t idx, uint64_t mask) {
     return reg[idx] >> 32;
 }
 
+
+bool RegCmpEq(uint64_t *regA, uint64_t *regB) {
+    return regA[0] == regB[0] && regA[1] == regB[1];
+}
+
+bool NumCmpLt(uint64_t *regA, uint64_t *regB) {
+    int32_t ia, ib;
+    uint32_t ua, ub;
+    float fa, fb;
+    double da, db;
+    int64_t wia, wib;
+    uint64_t wua, wub;
+
+    ERROR_TYPE_CHECK(MASK_OBJECT(regA[0]));
+    ERROR_TYPE_CHECK(MASK_OBJECT(regB[0]));
+
+    switch (MASK_NUMBER(regA[0])) {
+    case SINT:
+        ia = getDataChecked(regA, 0, SINT);
+        ib = getDataChecked(regB, 0, SINT);
+        return ia < ib;
+    case UINT:
+        ua = getDataChecked(regA, 0, UINT);
+        ub = getDataChecked(regB, 0, UINT);
+        return ua < ub;
+    case FLOAT:
+        fa = getDataChecked(regA, 0, FLOAT);
+        fb = getDataChecked(regB, 0, FLOAT);
+        return fa < fb;
+    case DOUBLE:
+        da = getDataChecked(regA, 0, DOUBLE);
+        db = getDataChecked(regB, 0, DOUBLE);
+        return da < db;
+    case SWINT:
+        wia = getDataChecked(regA, 0, SWINT);
+        wib = getDataChecked(regB, 0, SWINT);
+        return wia < wib;
+    case UWINT:
+        wua = getDataChecked(regA, 0, UWINT);
+        wub = getDataChecked(regB, 0, UWINT);
+        return wua < wub;
+    default:
+        ERROR_TYPE_CHECK(1);
+    }
+}
+
+bool DecodeCmp(uint64_t *regA, uint64_t *regB, Opcode op) {
+    switch (op) {
+    case OP_IF_EQ:
+        return RegCmpEq(regA, regB);
+    case OP_IF_NE:
+        return !RegCmpEq(regA, regB);
+    // Followings don't apply to Object
+    case OP_IF_LT:
+        return NumCmpLt(regA, regB);
+    case OP_IF_GE:
+        return !NumCmpLt(regA, regB);
+    // - Ordering of expr aside _or_ is important, cz RegCmpEq bypass type check
+    case OP_IF_LE:
+        return NumCmpLt(regA, regB) || RegCmpEq(regA, regB);
+    case OP_IF_GT:
+        return !(NumCmpLt(regA, regB) || RegCmpEq(regA, regB));
+    default:
+        return false;
+    }
+}
+

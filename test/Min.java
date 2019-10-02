@@ -15,6 +15,7 @@ public class Min {
         foo(1,2);
         foo(1,2);
         foo(1,2);
+        new Min();
         if (i == 0) {
             return i + 1;
         } else {
