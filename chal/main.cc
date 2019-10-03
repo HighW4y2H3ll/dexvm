@@ -407,7 +407,11 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IF_GEZ:
     case OP_IF_GTZ:
     case OP_IF_LEZ:
+    {
+        if (DecodeCmpZ(&regs[inst.vA], inst.opcode))
+            return &insns[(s4)inst.vC];  // Sign Extend
         break;
+    }
     case OP_CMPL_FLOAT:
     case OP_CMPG_FLOAT:
     case OP_CMPL_DOUBLE:

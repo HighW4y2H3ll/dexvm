@@ -15,7 +15,9 @@
 
 
 #define MASK_OBJECT(X)  (X & 0x7)
+#define UNMASK_OBJECT(X)  (X & (~0x7))
 #define MASK_NUMBER(X)  (X & 0xffffffff)
+#define UNMASK_NUMBER(X)  (X & (~0xffffffff))
 #define MASK_WIDE(X)    (X & 0x1f)
 
 #define ERROR_TYPE_CHECK(X)    if (X) {         \
@@ -166,3 +168,84 @@ bool DecodeCmp(uint64_t *regA, uint64_t *regB, Opcode op) {
     }
 }
 
+bool RegNullUndef(uint64_t *reg) {
+    uint64_t tmp;
+    float f;
+    double d;
+    // Undef
+    if (!reg[0]) return true;
+    // Object
+    if (MASK_OBJECT(reg[0]))
+        return !UNMASK_OBJECT(reg[0]);
+    switch (MASK_NUMBER(reg[0])) {
+    case SINT:
+    case UINT:
+        return !UNMASK_NUMBER(reg[0]);
+    case FLOAT:
+        tmp = getDataChecked(reg, 0, FLOAT);
+        f = *(float*)&tmp;
+        return f == 0.0 || f == -0.0;
+    case DOUBLE:
+        tmp = getDataChecked(reg, 0, DOUBLE);
+        d = *(double*)&tmp;
+        return d == 0.0 || d == -0.0;
+    case SWINT:
+    case UWINT:
+        tmp = getDataChecked(reg, 0, FLOAT);
+        return !tmp;
+    default:
+        ERROR_TYPE_CHECK(1);
+    }
+}
+
+bool NumCmpZLt(uint64_t *reg) {
+    int32_t i;
+    float f;
+    double d;
+    int64_t wi;
+    uint64_t tmp;
+
+    ERROR_TYPE_CHECK(MASK_OBJECT(reg[0]));
+
+    switch (MASK_NUMBER(reg[0])) {
+    case SINT:
+        i = getDataChecked(reg, 0, SINT);
+        return i < 0;
+    case FLOAT:
+        tmp = getDataChecked(reg, 0, FLOAT);
+        f = *(float*)&tmp;
+        return f < 0.0 || f < -0.0;
+    case DOUBLE:
+        tmp = getDataChecked(reg, 0, DOUBLE);
+        d = *(double*)&tmp;
+        return d < 0.0 || d < -0.0;
+    case SWINT:
+        wi = getDataChecked(reg, 0, SWINT);
+        return wi < 0;
+    case UINT:
+    case UWINT:
+        return false;
+    default:
+        ERROR_TYPE_CHECK(1);
+    }
+}
+
+bool DecodeCmpZ(uint64_t *regA, Opcode op) {
+    switch (op) {
+    case OP_IF_EQ:
+        return RegNullUndef(regA);
+    case OP_IF_NE:
+        return !RegNullUndef(regA);
+    // Followings don't apply to Object
+    case OP_IF_LT:
+        return NumCmpZLt(regA);
+    case OP_IF_GE:
+        return !NumCmpZLt(regA);
+    case OP_IF_LE:
+        return NumCmpZLt(regA) || RegNullUndef(regA);
+    case OP_IF_GT:
+        return !(NumCmpZLt(regA) || RegNullUndef(regA));
+    default:
+        return false;
+    }
+}
