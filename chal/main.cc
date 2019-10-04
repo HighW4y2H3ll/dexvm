@@ -26,6 +26,8 @@ const DexCode *maincode = NULL;
  *  - objects are 8 bytes aligned, use the lower bits to encode type
  */
 uint64_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the end
+                              // Strong Typed - overlapping should be fine
+                              // Might be able to corrupt wide data, but it wont be exploitable
 uint64_t result_reg[2] = {0};
 uint64_t xreg = 0;    // Exception Object Register
 
@@ -69,6 +71,16 @@ struct ArrayObject {
     uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
 };
 
+/**
+ *  Runtime Object
+ */
+struct RuntimeObject {
+    //const DexClassData *type;
+    uint64_t size;
+    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+};
+
+
 uint64_t getTypeCodeByTypdIdx(uint64_t idx) {
     const char *buf = dexStringByTypeIdx(dexfile, idx);
 
@@ -102,7 +114,7 @@ uint64_t getTypeCodeByTypdIdx(uint64_t idx) {
 }
 
 ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
-    ArrayObject *obj = NULL;
+    RuntimeObject *obj = NULL;
     uint64_t sz = sizeof(ArrayObject) + 2*sizeof(uint64_t)*len;
 
     obj = (ArrayObject*)malloc(sz);
@@ -113,14 +125,6 @@ ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
     return obj;
 }
 
-
-/**
- *  Runtime Object
- */
-struct RuntimeObject {
-    const DexClassData *type;
-    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
-};
 
 // Dex could handle at most 2^32 class
 HashMap *type_map = NULL;
@@ -256,20 +260,17 @@ const u2 *execute_one(const u2 *insns) {
     case OP_CONST_16:
     case OP_CONST:
     {
-        CheckTypeOrUndef(&regs[inst.vA], SINT);
-        regs[inst.vA] = EncodeType(inst.vB, SINT);
+        encodeData(regs, inst.vA, SINT, inst.vB);
         break;
     }
     case OP_CONST_UINT:
     {
-        CheckTypeOrUndef(&regs[inst.vA], UINT);
-        regs[inst.vA] = EncodeType(inst.vB, UINT);
+        encodeData(regs, inst.vA, UINT, inst.vB);
         break;
     }
     case OP_CONST_HIGH16:
     {
-        CheckTypeOrUndef(&regs[inst.vA], SINT);
-        regs[inst.vA] = EncodeType(inst.vB << 16, SINT);
+        encodeData(regs, inst.vA, SINT, inst.vB << 16);
         break;
     }
     /**
@@ -284,51 +285,27 @@ const u2 *execute_one(const u2 *insns) {
     case OP_CONST_WIDE_16:
     case OP_CONST_WIDE_32:
     {
-        CheckTypeOrUndef(&regs[inst.vA], SINT);
-        CheckTypeOrUndef(&regs[inst.vA+1], SINT);
-
-        regs[inst.vA] = EncodeType(inst.vB, SINT);
-        if (inst.vB & (1 << 31)) {
-            regs[inst.vA+1] = EncodeType(-1, SINT);
-        } else {
-            regs[inst.vA+1] = EncodeType(0, SINT);
-        }
+        encodeData(regs, inst.vA, SWINT, inst.vB);  // Auto sign-extend
         break;
     }
     case OP_CONST_WIDE:
     {
-        CheckTypeOrUndef(&regs[inst.vA], DOUBLE);
-        CheckTypeOrUndef(&regs[inst.vA+1], DOUBLE);
-
-        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, DOUBLE);
-        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, DOUBLE);
+        encodeData(regs, inst.vA, DOUBLE, inst.vB_wide);
         break;
     }
     case OP_CONST_WIDE_SLONG:
     {
-        CheckTypeOrUndef(&regs[inst.vA], SWINT);
-        CheckTypeOrUndef(&regs[inst.vA+1], SWINT);
-
-        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, SWINT);
-        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, SWINT);
+        encodeData(regs, inst.vA, SWINT, inst.vB_wide);
         break;
     }
     case OP_CONST_WIDE_ULONG:
     {
-        CheckTypeOrUndef(&regs[inst.vA], UWINT);
-        CheckTypeOrUndef(&regs[inst.vA+1], UWINT);
-
-        regs[inst.vA] = EncodeType(inst.vB_wide & 0xffffffff, UWINT);
-        regs[inst.vA+1] = EncodeType((inst.vB_wide >> 32) & 0xffffffff, UWINT);
+        encodeData(regs, inst.vA, UWINT, inst.vB_wide);
         break;
     }
     case OP_CONST_WIDE_HIGH16:
     {
-        CheckTypeOrUndef(&regs[inst.vA], SWINT);
-        CheckTypeOrUndef(&regs[inst.vA+1], SWINT);
-
-        regs[inst.vA] = EncodeType(0, SWINT);
-        regs[inst.vA+1] = EncodeType(inst.vB << 16, SWINT);
+        encodeData(regs, inst.vA, SWINT, inst.vB << 16);
         break;
     }
     case OP_CONST_STRING:
@@ -412,6 +389,21 @@ const u2 *execute_one(const u2 *insns) {
             return &insns[(s4)inst.vC];  // Sign Extend
         break;
     }
+    case OP_IGET:
+    case OP_IGET_WIDE:
+    case OP_IGET_OBJECT:
+    case OP_IGET_BOOLEAN:
+    case OP_IGET_BYTE:
+    case OP_IGET_CHAR:
+    case OP_IGET_SHORT:
+    case OP_IPUT:
+    case OP_IPUT_WIDE:
+    case OP_IPUT_OBJECT:
+    case OP_IPUT_BOOLEAN:
+    case OP_IPUT_BYTE:
+    case OP_IPUT_CHAR:
+    case OP_IPUT_SHORT:
+        break;
     case OP_CMPL_FLOAT:
     case OP_CMPG_FLOAT:
     case OP_CMPL_DOUBLE:

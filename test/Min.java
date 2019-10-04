@@ -1,5 +1,8 @@
 
 public class Min {
+    int a_;
+    float b_;
+    Min m_;
     public Min() {
         //System.out.println("h");
         //System.out.println("e");

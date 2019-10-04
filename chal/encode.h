@@ -25,11 +25,28 @@
     exit(-1);                                   \
 }
 
-uint64_t EncodeType(uint64_t n, uint64_t code) {
-    if (MASK_OBJECT(code)) {
-        return (n|code);
-    } else {
-        return ((n << 32)|code);
+void encodeData(uint64_t *reg, uint64_t idx, uint64_t mask, uint64_t data) {
+    CheckTypeOrUndef(&reg[idx], mask);
+    switch (mask) {
+    case OBJECT:
+    case STRING:
+    case ARRAY:
+        reg[idx] = (data&(~3))|mask;
+        break;
+    case SINT:
+    case UINT:
+    case FLOAT:
+        reg[idx] = (data << 32)|mask;
+        break;
+    case DOUBLE:
+    case SWINT:
+    case UWINT:
+        CheckTypeOrUndef(&reg[idx+1], mask);
+        reg[idx] = ((data&0xffffffff) << 32)|mask;
+        reg[idx+1] = (data&(~0xffffffff))|mask;
+        break;
+    default:
+        ERROR_TYPE_CHECK(1);
     }
 }
 
@@ -55,7 +72,7 @@ void CheckType(uint64_t *regA, uint64_t mask) {
 // Check 2 (wide) registers are of the same type
 void CheckTypeEq(uint64_t *regA, uint64_t *regB) {
     // regA is undefined
-    if (!regA[0])   return;
+    //if (!regA[0])   return;
 
     ERROR_TYPE_CHECK(MASK_OBJECT(regA[0]) != MASK_OBJECT(regB[0]));
 
