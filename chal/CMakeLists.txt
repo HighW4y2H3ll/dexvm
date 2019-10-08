@@ -24,9 +24,11 @@ add_library (libdex OBJECT
 	${PROJECT_SOURCE_DIR}/../dalvik/libdex/SysUtil.cpp
 	${PROJECT_SOURCE_DIR}/../dalvik/libdex/ZipArchive.cpp
     )
+set_target_properties(libdex PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
 
 add_definitions (-DHAVE_POSIX_FILEMAP=1)
 add_definitions (-DCONF_SEMILAVA_MAGIC_1=0x0)
 
 add_executable (dexvm main.cc linkframe.cc)
 target_link_libraries (dexvm libdex z)
+set_target_properties(dexvm PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
