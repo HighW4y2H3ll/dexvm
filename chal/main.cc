@@ -62,14 +62,6 @@ const DexClassDef *getClassDefByTypeIdx(u4 idx) {
 }
 
 
-/**
- *  Array Object
- */
-struct ArrayObject {
-    uint64_t size;
-    uint64_t typecode;
-    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
-};
 
 /**
  *  Runtime Object
@@ -81,15 +73,10 @@ struct RuntimeObject {
 };
 
 
-uint64_t getTypeCodeByTypdIdx(uint64_t idx) {
+uint64_t getTypeCodeByTypeIdx(uint64_t idx) {
     const char *buf = dexStringByTypeIdx(dexfile, idx);
 
-    if (buf[0] != '[') {
-        dprintf(2, "Error: Expected Array Descriptor\n");
-        exit(-1);
-    }
-
-    switch (buf[1]) {
+    switch (buf[0]) {
     case 'Z':
     case 'B':
     case 'S':
@@ -113,16 +100,15 @@ uint64_t getTypeCodeByTypdIdx(uint64_t idx) {
     }
 }
 
-ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
+RuntimeObject *newStringObject(const char *buf, uint64_t len) {
     RuntimeObject *obj = NULL;
-    uint64_t sz = sizeof(ArrayObject) + 2*sizeof(uint64_t)*len;
-
-    obj = (ArrayObject*)malloc(sz);
+    uint64_t sz = sizeof(RuntimeObject) + len + 1;
+    sz = (sz+7)&(~7);
+    obj = (RuntimeObject*)malloc(sz);
     memset(obj, 0, sz);
 
     obj->size = len;
-    obj->typecode = getTypeCodeByTypdIdx(typeidx);
-    return obj;
+    memcpy(obj->data, buf, len);
 }
 
 
@@ -142,27 +128,69 @@ DexClassData *findClassObject(const DexClassDef *cls) {
     return class_data;
 }
 
+
+uint64_t initKeyValueEntry(uint64_t mask, const char *key) {
+    uint64_t sz = sizeof(RuntimeObject) + 3*sizeof(uint64_t);
+    RuntimeObject *obj = (RuntimeObject*)malloc(sz);
+    memset(obj, 0, sz);
+    obj->size = 3;  // 2 fields in one entry: [0] - string object for key, everything goes as string
+                    //                        [1..2] - Anything data that use the same encoding in register
+    encodeData(obj->data, 0, STRING,
+            (uint64_t)newStringObject(key, strlen(key)));
+    encodeData(obj->data, 1, mask, 0);
+    return (uint64_t)obj;
+}
+
 RuntimeObject *newClassObject(const DexClassDef *cls) {
-    uint64_t sz = 0;
+    uint64_t i, mask, sz;
+    const char *name = NULL;
     RuntimeObject *obj = NULL;
+    const DexFieldId *dfi = NULL;
     DexClassData *class_data = findClassObject(cls);
 
     // !!! Need 0x0100 0000 0000 0001 to Int overflow - probably too big to actually worry about
-    sz = sizeof(RuntimeObject) + 2*sizeof(uint64_t)*class_data->header.instanceFieldsSize;
+    sz = sizeof(RuntimeObject) + sizeof(uint64_t)*class_data->header.instanceFieldsSize;
     obj = (RuntimeObject*)malloc(sz);
 
     memset(obj, 0, sz);
-    obj->type = class_data;
+    obj->size = class_data->header.instanceFieldsSize;
+    for (i = 0; i < obj->size; i++) {
+        dfi = dexGetFieldId(dexfile, class_data->instanceFields[i].fieldIdx);
+        mask = getTypeCodeByTypeIdx(dfi->typeIdx);
+        name = dexStringById(dexfile, dfi->nameIdx);
+        dprintf(2, "Debug %s - %x\n", name, mask);
+        encodeData(obj->data, i, OBJECT,
+                initKeyValueEntry(mask, name));
+    }
     return obj;
 }
 
+RuntimeObject *newArrayObject(uint64_t len, uint64_t typeidx) {
+    uint64_t i;
+    char idxstr[17] = {0};
+    RuntimeObject *obj = NULL;
+    uint64_t sz = sizeof(RuntimeObject) + sizeof(uint64_t)*len;
+
+    obj = (RuntimeObject*)malloc(sz);
+    memset(obj, 0, sz);
+
+    obj->size = len;
+    for (i = 0; i < len; i++) {
+        snprintf(idxstr, 16, "%llx", i);
+        encodeData(obj->data, i, OBJECT,
+                initKeyValueEntry(
+                    getTypeCodeByTypeIdx(typeidx),
+                    idxstr));
+    }
+    return obj;
+}
+
+
 const u2 *execute_one(const u2 *insns) {
     const char *buf;
-    char *strptr;
     uint64_t sz;
     const DexClassDef *class_def = NULL;
     RuntimeObject *obj = NULL;
-    ArrayObject *arr = NULL;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -311,44 +339,35 @@ const u2 *execute_one(const u2 *insns) {
     case OP_CONST_STRING:
     case OP_CONST_STRING_JUMBO:
     {
-        CheckTypeOrUndef(&regs[inst.vA], STRING);
-
         buf = dexStringById(dexfile, inst.vB);
-        strptr = (char*)malloc(strlen(buf));
-        strcpy(strptr, buf);
+        obj = newStringObject(buf, strlen(buf));
 
-        regs[inst.vA] = EncodeType((uint64_t)strptr, STRING);
+        encodeData(regs, inst.vA, STRING, (uint64_t)obj);
         break;
     }
     case OP_CONST_CLASS:
     case OP_NEW_INSTANCE:
     {
-        CheckTypeOrUndef(&regs[inst.vA], OBJECT);
-
         class_def = getClassDefByTypeIdx(inst.vB);
         obj = newClassObject(class_def);
-        //dprintf(2, "DEBUG %s - %d - %p\n", dexGetClassDescriptor(dexfile, class_def),
-        //        obj->type->header.instanceFieldsSize, obj);
-        regs[inst.vA] = EncodeType((uint64_t)obj, OBJECT);
+        //dprintf(2, "DEBUG %s - %p\n", dexGetClassDescriptor(dexfile, class_def), obj);
+        encodeData(regs, inst.vA, OBJECT, (uint64_t)obj);
         break;
     }
     case OP_NEW_ARRAY:
     {
-        CheckTypeOrUndef(&regs[inst.vA], ARRAY);
-
         sz = getDataChecked(regs, inst.vB, SINT);
-        arr = newArrayObject(sz, inst.vC);
+        obj = newArrayObject(sz, inst.vC);
         //dprintf(2, "ARRAY %d - %p - %x\n", sz, arr, arr->typecode);
-        regs[inst.vA] = EncodeType((uint64_t)arr, ARRAY);
+        encodeData(regs, inst.vA, ARRAY, (uint64_t)obj);
 
         break;
     }
     case OP_ARRAY_LENGTH:
     {
         CheckType(&regs[inst.vB], ARRAY);
-        arr = (ArrayObject*)getDataChecked(regs, inst.vB, ARRAY);
-        CheckTypeOrUndef(&regs[inst.vA], SINT);
-        regs[inst.vA] = EncodeType((uint64_t)arr->size, SINT);
+        obj = (RuntimeObject*)getDataChecked(regs, inst.vB, ARRAY);
+        encodeData(regs, inst.vA, SINT, obj->size);
         break;
     }
     case OP_THROW:

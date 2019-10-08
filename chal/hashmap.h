@@ -1,4 +1,6 @@
 
+// This shoudl be hashmap, but clearly it's not. I was more ambitious than this
+// But ughh, who cares. Let it be, let it be..
 //#include <libdex/sha1.h>
 
 struct HashEntry {
