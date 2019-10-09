@@ -434,7 +434,7 @@ const u2 *execute_one(const u2 *insns) {
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
-            encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]);
+            encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]); // BUG!: OOB array Read
         } else if (MASK_OBJECT(regs[inst.vB])) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
             CheckTypeEq(&regs[inst.vA], tmp_reg);
@@ -453,7 +453,7 @@ const u2 *execute_one(const u2 *insns) {
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
-            ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff;
+            ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff; // BUG!: OOB Array write
         } else if (MASK_OBJECT(regs[inst.vB])) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
             CheckTypeEq(&regs[inst.vA], tmp_reg);
