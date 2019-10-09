@@ -158,7 +158,7 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
         dfi = dexGetFieldId(dexfile, class_data->instanceFields[i].fieldIdx);
         mask = getTypeCodeByTypeIdx(dfi->typeIdx);
         name = dexStringById(dexfile, dfi->nameIdx);
-        dprintf(2, "Debug %s - %x\n", name, mask);
+        //dprintf(2, "Debug %s - %x\n", name, mask);
         encodeData(obj->data, i, OBJECT,
                 initKeyValueEntry(mask, name));
     }
@@ -185,12 +185,27 @@ RuntimeObject *newArrayObject(uint64_t len, uint64_t typeidx) {
     return obj;
 }
 
+uint64_t *lookupInstanceField(RuntimeObject *obj, const char *name) {
+    uint64_t i;
+    RuntimeObject *tmp_obj, *name_obj;
+
+    for (i = 0; i < obj->size; i++) {
+        tmp_obj = (RuntimeObject*)getDataChecked(obj->data, i, OBJECT);
+        name_obj = (RuntimeObject*)getDataChecked(tmp_obj->data, 0, STRING);
+        if (!strncmp(name, (char*)name_obj->data, name_obj->size))
+            return &tmp_obj->data[1];
+    }
+
+    return NULL;
+}
+
 
 const u2 *execute_one(const u2 *insns) {
     const char *buf;
     uint64_t sz;
     const DexClassDef *class_def = NULL;
     RuntimeObject *obj = NULL;
+    uint64_t *tmp_reg = NULL;
     Opcode op;
     DecodedInstruction inst;
     op = dexOpcodeFromCodeUnit(insns[0]);
@@ -415,6 +430,18 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IGET_BYTE:
     case OP_IGET_CHAR:
     case OP_IGET_SHORT:
+    {
+        buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
+        if (regs[inst.vB] & STRING) {
+            obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
+            encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]);
+        } else if (MASK_OBJECT(regs[inst.vB])) {
+            tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
+            CheckTypeEq(&regs[inst.vA], tmp_reg);
+            memcpy(&regs[inst.vA], tmp_reg, 2*sizeof(uint64_t));
+        }
+        break;
+    }
     case OP_IPUT:
     case OP_IPUT_WIDE:
     case OP_IPUT_OBJECT:
@@ -422,7 +449,18 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IPUT_BYTE:
     case OP_IPUT_CHAR:
     case OP_IPUT_SHORT:
+    {
+        buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
+        if (regs[inst.vB] & STRING) {
+            obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
+            ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff;
+        } else if (MASK_OBJECT(regs[inst.vB])) {
+            tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
+            CheckTypeEq(&regs[inst.vA], tmp_reg);
+            memcpy(tmp_reg, &regs[inst.vA], 2*sizeof(uint64_t));
+        }
         break;
+    }
     case OP_CMPL_FLOAT:
     case OP_CMPG_FLOAT:
     case OP_CMPL_DOUBLE:

@@ -26,6 +26,8 @@
 }
 
 
+// Checks here allow type confusion between Object and Numbers,
+// but it's probably fine
 void CheckTypeOrUndef(uint64_t *regA, uint64_t mask) {
     // Undefined
     if (!regA[0])   return;
