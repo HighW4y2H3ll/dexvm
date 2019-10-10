@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/mman.h>
 
 #include "libdex/SysUtil.h"
 #include "libdex/DexFile.h"
@@ -529,6 +530,7 @@ void run(const u2 *insns, u4 insn_size) {
 int main(int argc, char** argv) {
     char *path;
     struct stat st;
+    u4 rsz;
     MemMapping pmap;
     int dexfd;
     u4 idx = 0;
@@ -550,14 +552,26 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    if (sysCreatePrivateMap(st.st_size, &pmap) != 0) {
+    rsz = (st.st_size + 0xfff)&(~0xfff);
+    if (sysCreatePrivateMap(0xff*rsz, &pmap) != 0) {
         dprintf(2, "Create Mapping Failed\n");
         return -1;
     }
 
     dexfd = open(path, O_RDONLY);
-    if (sysMapFileInShmemWritableReadOnly(dexfd, &pmap) != 0) {
+    dprintf(2, "Randomizing Dex file mapping...\n");
+
+    //(sysMapFileInShmemWritableReadOnly(dexfd, &pmap) != 0)
+    if (read(dexfd, pmap.addr+STUPID_RANDOM_OFFSET*rsz, st.st_size) != st.st_size) {
         dprintf(2, "File Mapping Failed\n");
+        return -1;
+    }
+    munmap(pmap.addr, STUPID_RANDOM_OFFSET*rsz);
+    pmap.baseAddr = pmap.addr = pmap.addr + STUPID_RANDOM_OFFSET*rsz;
+    pmap.baseLength = pmap.length = st.st_size;
+    munmap(pmap.addr + rsz, (0xff-1-STUPID_RANDOM_OFFSET)*rsz);
+    if (mprotect(pmap.addr, rsz, PROT_READ) < 0) {
+        dprintf(2, "Mprotect Failed\n");
         return -1;
     }
 

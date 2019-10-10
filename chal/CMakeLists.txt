@@ -28,7 +28,8 @@ set_target_properties(libdex PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
 
 add_definitions (-DHAVE_POSIX_FILEMAP=1)
 add_definitions (-DCONF_SEMILAVA_MAGIC_1=0x0)
+add_definitions (-DSTUPID_RANDOM_OFFSET=0x20)
 
 add_executable (dexvm main.cc linkframe.cc)
 target_link_libraries (dexvm libdex z)
-set_target_properties(dexvm PROPERTIES COMPILE_FLAGS "-m32 -no-pie" LINK_FLAGS "-m32 -no-pie")
+set_target_properties(dexvm PROPERTIES COMPILE_FLAGS "-m32 -no-pie -z relro -z now" LINK_FLAGS "-m32 -no-pie -z relro -z now")
