@@ -70,7 +70,7 @@ const DexClassDef *getClassDefByTypeIdx(u4 idx) {
 struct RuntimeObject {
     //const DexClassData *type;
     uint64_t size;
-    uint64_t data[0]; // Each Data field holds 2 slots, follow the same reg encoding
+    uint64_t data[0]; // Each Data field holds 1 Object, follow the same reg encoding
 };
 
 
@@ -166,23 +166,22 @@ RuntimeObject *newClassObject(const DexClassDef *cls) {
     return obj;
 }
 
-RuntimeObject *newArrayObject(uint64_t len, uint64_t typeidx) {
-    uint64_t i;
-    char idxstr[17] = {0};
-    RuntimeObject *obj = NULL;
-    uint64_t sz = sizeof(RuntimeObject) + sizeof(uint64_t)*len;
+struct ArrayObject {
+    uint64_t size;
+    uint64_t type;
+    uint64_t data[0];   // Each Data field holds 1/2 data, NOT follow the reg encoding
+};
 
-    obj = (RuntimeObject*)malloc(sz);
+ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
+    uint64_t i;
+    ArrayObject *obj = NULL;
+    uint64_t ty = getTypeCodeByTypeIdx(typeidx);
+    uint64_t sz = sizeof(ArrayObject) + sizeof(uint64_t)*len;
+
+    obj = (ArrayObject*)malloc(sz);
     memset(obj, 0, sz);
 
     obj->size = len;
-    for (i = 0; i < len; i++) {
-        snprintf(idxstr, 16, "%llx", i);
-        encodeData(obj->data, i, OBJECT,
-                initKeyValueEntry(
-                    getTypeCodeByTypeIdx(typeidx),
-                    idxstr));
-    }
     return obj;
 }
 
@@ -201,11 +200,35 @@ uint64_t *lookupInstanceField(RuntimeObject *obj, const char *name) {
 }
 
 
+void fetchArrayData(uint64_t *reg, ArrayObject *arr, const char *idxstr) {
+    uint64_t idx = atoi(idxstr);
+    if (idx < arr->size) {
+        if (MASK_WIDE(arr->type)) {
+            encodeData(reg, 0, arr->type, ((uint32_t*)arr->data)[idx]);
+        } else {
+            encodeData(reg, 0, arr->type, ((uint64_t*)arr->data)[idx]);
+        }
+    }
+}
+
+void putArrayData(uint64_t *reg, ArrayObject *arr, const char *idxstr) {
+    uint64_t idx = atoi(idxstr);
+    if (idx < arr->size) {
+        if (MASK_WIDE(arr->type)) {
+            ((uint32_t*)arr->data)[idx] = getDataChecked(reg, 0, arr->type) & 0xffffffff;
+        } else {
+            ((uint64_t*)arr->data)[idx] = getDataChecked(reg, 0, arr->type);
+        }
+    }
+}
+
+
 const u2 *execute_one(const u2 *insns) {
     const char *buf;
     uint64_t sz;
     const DexClassDef *class_def = NULL;
     RuntimeObject *obj = NULL;
+    ArrayObject *arr = NULL;
     uint64_t *tmp_reg = NULL;
     Opcode op;
     DecodedInstruction inst;
@@ -373,17 +396,17 @@ const u2 *execute_one(const u2 *insns) {
     case OP_NEW_ARRAY:
     {
         sz = getDataChecked(regs, inst.vB, SINT);
-        obj = newArrayObject(sz, inst.vC);
+        arr = newArrayObject(sz, inst.vC);
         //dprintf(2, "ARRAY %d - %p - %x\n", sz, arr, arr->typecode);
-        encodeData(regs, inst.vA, ARRAY, (uint64_t)obj);
+        encodeData(regs, inst.vA, ARRAY, (uint64_t)arr);
 
         break;
     }
     case OP_ARRAY_LENGTH:
     {
         CheckType(&regs[inst.vB], ARRAY);
-        obj = (RuntimeObject*)getDataChecked(regs, inst.vB, ARRAY);
-        encodeData(regs, inst.vA, SINT, obj->size);
+        arr = (ArrayObject*)getDataChecked(regs, inst.vB, ARRAY);
+        encodeData(regs, inst.vA, SINT, arr->size);
         break;
     }
     case OP_THROW:
@@ -432,11 +455,15 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IGET_CHAR:
     case OP_IGET_SHORT:
     {
+        if (!MASK_OBJECT(regs[inst.vB]))
+            break;
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
             encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]); // BUG!: OOB array Read
-        } else if (MASK_OBJECT(regs[inst.vB])) {
+        } else if (regs[inst.vB] & ARRAY) {
+            fetchArrayData(&regs[inst.vA], arr, buf);
+        } else if (regs[inst.vB] & OBJECT) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
             CheckTypeEq(&regs[inst.vA], tmp_reg);
             memcpy(&regs[inst.vA], tmp_reg, 2*sizeof(uint64_t));
@@ -451,11 +478,15 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IPUT_CHAR:
     case OP_IPUT_SHORT:
     {
+        if (!MASK_OBJECT(regs[inst.vB]))
+            break;
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
             ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff; // BUG!: OOB Array write
-        } else if (MASK_OBJECT(regs[inst.vB])) {
+        } else if (regs[inst.vB] & ARRAY) {
+            putArrayData(&regs[inst.vA], arr, buf);
+        } else if (regs[inst.vB] & OBJECT) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
             CheckTypeEq(&regs[inst.vA], tmp_reg);
             memcpy(tmp_reg, &regs[inst.vA], 2*sizeof(uint64_t));
@@ -562,14 +593,14 @@ int main(int argc, char** argv) {
     dprintf(2, "Randomizing Dex file mapping...\n");
 
     //(sysMapFileInShmemWritableReadOnly(dexfd, &pmap) != 0)
-    if (read(dexfd, pmap.addr+STUPID_RANDOM_OFFSET*rsz, st.st_size) != st.st_size) {
+    if (read(dexfd, (char*)pmap.addr+STUPID_RANDOM_OFFSET*rsz, st.st_size) != st.st_size) {
         dprintf(2, "File Mapping Failed\n");
         return -1;
     }
     munmap(pmap.addr, STUPID_RANDOM_OFFSET*rsz);
-    pmap.baseAddr = pmap.addr = pmap.addr + STUPID_RANDOM_OFFSET*rsz;
+    pmap.baseAddr = pmap.addr = (char*)pmap.addr + STUPID_RANDOM_OFFSET*rsz;
     pmap.baseLength = pmap.length = st.st_size;
-    munmap(pmap.addr + rsz, (0xff-1-STUPID_RANDOM_OFFSET)*rsz);
+    munmap((char*)pmap.addr + rsz, (0xff-1-STUPID_RANDOM_OFFSET)*rsz);
     if (mprotect(pmap.addr, rsz, PROT_READ) < 0) {
         dprintf(2, "Mprotect Failed\n");
         return -1;

@@ -6,7 +6,7 @@ public class Min {
     //public static void main(String[] args) {
     //}
     public static void foo() {
-        int a[] = new int[(0xff-1-0x20)*0x1000/8-3];
+        int a[] = new int[(0xff-1-0x20)*0x1000/8-5];
         String x;
         x = "-13";  // String to be the offset to StringIds
         x = "-14";  // String to be the offset to StringIds
