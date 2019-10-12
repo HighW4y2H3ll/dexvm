@@ -223,6 +223,107 @@ void putArrayData(uint64_t *reg, ArrayObject *arr, const char *idxstr) {
 }
 
 
+void doBinop(uint64_t *dst, char op, uint64_t *op1, uint64_t *op2) {
+    uint64_t type, tmp1, tmp2;
+    int32_t i1, i2;
+    uint32_t u1, u2;
+    int64_t l1, l2;
+    uint64_t ul1, ul2;
+    float f1, f2;
+    double d1, d2;
+
+    CheckTypeEq(op1, op2);
+
+    type = MASK_OBJECT(op1[0]);
+    if (!type)  type = MASK_NUMBER(op1[0]);
+
+    tmp1 = getDataChecked(op1, 0, type);
+    tmp2 = getDataChecked(op2, 0, type);
+#define DO_BINOP_I(X, Y)                            \
+    switch (op) {                                   \
+    case '+':                                       \
+        X = X+Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '-':                                       \
+        X = X-Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '*':                                       \
+        X = X*Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '/':                                       \
+        X = X/Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '%':                                       \
+        X = X%Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    default:                                        \
+        break;                                      \
+    }
+
+#define DO_BINOP_F(X, Y)                            \
+    switch (op) {                                   \
+    case '+':                                       \
+        X = X+Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '-':                                       \
+        X = X-Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '*':                                       \
+        X = X*Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    case '/':                                       \
+        X = X/Y;                                    \
+        encodeData(dst, 0, type, *(uint64_t*)&X);   \
+        break;                                      \
+    default:                                        \
+        break;                                      \
+    }
+
+    switch (type) {
+    case SINT:
+        i1 = *(int32_t*)&tmp1;
+        i2 = *(int32_t*)&tmp2;
+        DO_BINOP_I(i1, i2);
+        break;
+    case UINT:
+        u1 = *(uint32_t*)&tmp1;
+        u2 = *(uint32_t*)&tmp2;
+        DO_BINOP_I(u1, u2);
+        break;
+    case FLOAT:
+        f1 = *(float*)&tmp1;
+        f2 = *(float*)&tmp2;
+        DO_BINOP_F(f1, f2);
+        break;
+    case DOUBLE:
+        d1 = *(double*)&tmp1;
+        d2 = *(double*)&tmp2;
+        DO_BINOP_F(d1, d2);
+        break;
+    case SWINT:
+        l1 = (int64_t)tmp1;
+        l2 = (int64_t)tmp2;
+        DO_BINOP_I(l1, l2);
+        break;
+    case UWINT:
+        ul1 = tmp1;
+        ul2 = tmp2;
+        DO_BINOP_I(ul1, ul2);
+        break;
+    default:    // Bailout if type don't match
+        return;
+    }
+}
+
+
 const u2 *execute_one(const u2 *insns) {
     const char *buf;
     uint64_t sz;
@@ -493,20 +594,46 @@ const u2 *execute_one(const u2 *insns) {
         }
         break;
     }
-    case OP_CMPL_FLOAT:
-    case OP_CMPG_FLOAT:
-    case OP_CMPL_DOUBLE:
-    case OP_CMPG_DOUBLE:
-    case OP_CMP_LONG:
-    case OP_PACKED_SWITCH:
-    case OP_SPARSE_SWITCH:
-    case OP_FILLED_NEW_ARRAY:
-    case OP_FILLED_NEW_ARRAY_RANGE:
-    case OP_FILL_ARRAY_DATA:
-    case OP_INSTANCE_OF:
-    case OP_CHECK_CAST:
-    case OP_MONITOR_ENTER:
-    case OP_MONITOR_EXIT:
+    case OP_ADD_INT:
+    case OP_ADD_LONG:
+    case OP_ADD_FLOAT:
+    case OP_ADD_DOUBLE:
+    {
+        doBinop(&regs[inst.vA], '+', &regs[inst.vB], &regs[inst.vC]);
+        break;
+    }
+    case OP_SUB_INT:
+    case OP_SUB_LONG:
+    case OP_SUB_FLOAT:
+    case OP_SUB_DOUBLE:
+    {
+        doBinop(&regs[inst.vA], '-', &regs[inst.vB], &regs[inst.vC]);
+        break;
+    }
+    case OP_MUL_INT:
+    case OP_MUL_LONG:
+    case OP_MUL_FLOAT:
+    case OP_MUL_DOUBLE:
+    {
+        doBinop(&regs[inst.vA], '*', &regs[inst.vB], &regs[inst.vC]);
+        break;
+    }
+    case OP_DIV_INT:
+    case OP_DIV_LONG:
+    case OP_DIV_FLOAT:
+    case OP_DIV_DOUBLE:
+    {
+        doBinop(&regs[inst.vA], '/', &regs[inst.vB], &regs[inst.vC]);
+        break;
+    }
+    case OP_REM_INT:
+    case OP_REM_LONG:
+    case OP_REM_FLOAT:
+    case OP_REM_DOUBLE:
+    {
+        doBinop(&regs[inst.vA], '%', &regs[inst.vB], &regs[inst.vC]);
+        break;
+    }
     case OP_NOP:
     default:
     {
