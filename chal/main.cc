@@ -182,6 +182,7 @@ ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
     memset(obj, 0, sz);
 
     obj->size = len;
+    obj->type = ty;
     return obj;
 }
 
