@@ -74,6 +74,35 @@ struct RuntimeObject {
 };
 
 
+uint64_t getArrayFieldType(uint64_t idx) {
+    const char *buf = dexStringByTypeIdx(dexfile, idx);
+
+    ERROR_TYPE_CHECK(buf[0] != '[');
+
+    switch (buf[1]) {
+    case 'Z':
+    case 'B':
+    case 'S':
+    case 'I':
+        return SINT;
+    case 'C':
+        return UINT;
+    case 'J':
+        return SWINT;
+    case 'F':
+        return FLOAT;
+    case 'D':
+        return DOUBLE;
+    case 'L':
+        return OBJECT;
+    case '[':
+        return ARRAY;
+    default:
+        dprintf(2, "Error: Unknown Type Descriptor\n");
+        exit(-1);
+    }
+}
+
 uint64_t getTypeCodeByTypeIdx(uint64_t idx) {
     const char *buf = dexStringByTypeIdx(dexfile, idx);
 
@@ -175,7 +204,7 @@ struct ArrayObject {
 ArrayObject *newArrayObject(uint64_t len, uint64_t typeidx) {
     uint64_t i;
     ArrayObject *obj = NULL;
-    uint64_t ty = getTypeCodeByTypeIdx(typeidx);
+    uint64_t ty = getArrayFieldType(typeidx);
     uint64_t sz = sizeof(ArrayObject) + sizeof(uint64_t)*len;
 
     obj = (ArrayObject*)malloc(sz);
@@ -564,6 +593,7 @@ const u2 *execute_one(const u2 *insns) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
             encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]); // BUG!: OOB array Read
         } else if (regs[inst.vB] & ARRAY) {
+            arr = (ArrayObject*)UNMASK_OBJECT(regs[inst.vB]);
             fetchArrayData(&regs[inst.vA], arr, buf);
         } else if (regs[inst.vB] & OBJECT) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
@@ -587,6 +617,7 @@ const u2 *execute_one(const u2 *insns) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
             ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff; // BUG!: OOB Array write
         } else if (regs[inst.vB] & ARRAY) {
+            arr = (ArrayObject*)UNMASK_OBJECT(regs[inst.vB]);
             putArrayData(&regs[inst.vA], arr, buf);
         } else if (regs[inst.vB] & OBJECT) {
             tmp_reg = lookupInstanceField((RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]), buf);
