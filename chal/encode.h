@@ -201,7 +201,7 @@ bool RegNullUndef(uint64_t *reg) {
     switch (MASK_NUMBER(reg[0])) {
     case SINT:
     case UINT:
-        return !UNMASK_NUMBER(reg[0]);
+        return !getDataChecked(reg, 0, MASK_NUMBER(reg[0]));
     case FLOAT:
         tmp = getDataChecked(reg, 0, FLOAT);
         f = *(float*)&tmp;
@@ -253,18 +253,18 @@ bool NumCmpZLt(uint64_t *reg) {
 
 bool DecodeCmpZ(uint64_t *regA, Opcode op) {
     switch (op) {
-    case OP_IF_EQ:
+    case OP_IF_EQZ:
         return RegNullUndef(regA);
-    case OP_IF_NE:
+    case OP_IF_NEZ:
         return !RegNullUndef(regA);
     // Followings don't apply to Object
-    case OP_IF_LT:
+    case OP_IF_LTZ:
         return NumCmpZLt(regA);
-    case OP_IF_GE:
+    case OP_IF_GEZ:
         return !NumCmpZLt(regA);
-    case OP_IF_LE:
+    case OP_IF_LEZ:
         return NumCmpZLt(regA) || RegNullUndef(regA);
-    case OP_IF_GT:
+    case OP_IF_GTZ:
         return !(NumCmpZLt(regA) || RegNullUndef(regA));
     default:
         return false;

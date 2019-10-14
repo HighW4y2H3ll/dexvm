@@ -575,7 +575,7 @@ const u2 *execute_one(const u2 *insns) {
     case OP_IF_LEZ:
     {
         if (DecodeCmpZ(&regs[inst.vA], inst.opcode))
-            return &insns[(s4)inst.vC];  // Sign Extend
+            return &insns[(s4)inst.vB];  // Sign Extend
         break;
     }
     case OP_IGET:
