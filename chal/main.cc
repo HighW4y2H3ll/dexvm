@@ -284,11 +284,11 @@ void doBinop(uint64_t *dst, char op, uint64_t *op1, uint64_t *op2) {
         encodeData(dst, 0, type, *(uint64_t*)&X);   \
         break;                                      \
     case '/':                                       \
-        X = X/Y;                                    \
+        X = tmp1/tmp2;                                    \
         encodeData(dst, 0, type, *(uint64_t*)&X);   \
         break;                                      \
     case '%':                                       \
-        X = X%Y;                                    \
+        X = tmp1%tmp2;                                    \
         encodeData(dst, 0, type, *(uint64_t*)&X);   \
         break;                                      \
     default:                                        \
@@ -675,8 +675,8 @@ const u2 *execute_one(const u2 *insns) {
 
     // Handle Exception
     if (xreg) {
-        const DexTry *tries = dexGetTries(maincode);
-        dexGetCatchHandlerData(maincode);
+        //const DexTry *tries = dexGetTries(maincode);
+        //dexGetCatchHandlerData(maincode);
     }
 
     return &insns[dexGetWidthFromOpcode(op)];
