@@ -591,7 +591,7 @@ const u2 *execute_one(const u2 *insns) {
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
-            encodeData(regs, inst.vA, SINT, ((char*)obj->data)[atoi(buf)]); // BUG!: OOB array Read
+            encodeData(regs, inst.vA, SINT, ((char*)obj->data)[strtoul(buf, NULL, 10)]); // BUG!: OOB array Read
         } else if (regs[inst.vB] & ARRAY) {
             arr = (ArrayObject*)UNMASK_OBJECT(regs[inst.vB]);
             fetchArrayData(&regs[inst.vA], arr, buf);
@@ -615,7 +615,7 @@ const u2 *execute_one(const u2 *insns) {
         buf = dexStringById(dexfile, inst.vC);    // Field Id now is String Id
         if (regs[inst.vB] & STRING) {
             obj = (RuntimeObject*)UNMASK_OBJECT(regs[inst.vB]);
-            ((char*)obj->data)[atoi(buf)] = getDataChecked(regs, inst.vA, SINT) & 0xff; // BUG!: OOB Array write
+            ((char*)obj->data)[strtoul(buf, NULL, 10)] = getDataChecked(regs, inst.vA, SINT) & 0xff; // BUG!: OOB Array write
         } else if (regs[inst.vB] & ARRAY) {
             arr = (ArrayObject*)UNMASK_OBJECT(regs[inst.vB]);
             putArrayData(&regs[inst.vA], arr, buf);
