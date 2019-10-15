@@ -32,13 +32,23 @@ uint64_t regs[65537] = {0};   // One more Reg to withstand *-wide copy at the en
 uint64_t result_reg[2] = {0};
 uint64_t xreg = 0;    // Exception Object Register
 
+uint64_t loglevel = 2;
+
 // Link Frame to store the context info inside invoke/call
 // The Current link state in (nested) subroutine
 LinkFrame *linkstate = NULL;
 
 
 void DumpInst(DecodedInstruction *inst) {
-    dprintf(2, "%s %d %d\n", dexGetOpcodeName(inst->opcode), inst->vA, inst->vB);
+    switch (loglevel) {
+    case 0:
+        break;
+    case 1:
+        dprintf(2, "%s\n", dexGetOpcodeName(inst->opcode));
+        break;
+    default:
+        dprintf(2, "%s %d %d\n", dexGetOpcodeName(inst->opcode), inst->vA, inst->vB);
+    }
 }
 
 
@@ -665,6 +675,10 @@ const u2 *execute_one(const u2 *insns) {
     {
         doBinop(&regs[inst.vA], '%', &regs[inst.vB], &regs[inst.vC]);
         break;
+    }
+    case OP_LOG_LEVEL:
+    {
+        loglevel = inst.vA;
     }
     case OP_NOP:
     default:
