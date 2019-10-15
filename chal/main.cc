@@ -714,6 +714,7 @@ void run(const u2 *insns, u4 insn_size) {
 #define LOOP16(X)   LOOP4(LOOP4(X))
 #define LOOP256(X)  LOOP16(LOOP16(X))
     LOOP256(EXEC_LOOP);
+    LOOP256(EXEC_LOOP);
 }
 
 
